@@ -3,6 +3,7 @@ create table chats (
   user_id text not null,
   title text default 'New Chat',
   model_id text default 'openai/gpt-4o-mini',
+  context_size integer default 8,
   system_prompt text default '',
   created_at timestamptz default now(),
   updated_at timestamptz default now()

@@ -34,7 +34,7 @@ export async function POST(req: Request) {
     // b. Fetch chat config
     const { data: chat, error: chatError } = await supabase
       .from('chats')
-      .select('model_id, system_prompt')
+      .select('model_id, system_prompt, context_size')
       .eq('id', chatId)
       .single()
 
@@ -45,13 +45,14 @@ export async function POST(req: Request) {
       })
     }
 
-    // c. Fetch last 8 messages (desc), then reverse to chronological
+    // c. Fetch last N messages (desc), then reverse to chronological
+    const contextSize = chat.context_size ?? 8
     const { data: recentMessages } = await supabase
       .from('messages')
       .select('role, content')
       .eq('chat_id', chatId)
       .order('created_at', { ascending: false })
-      .limit(8)
+      .limit(contextSize)
 
     const last8 = (recentMessages ?? []).reverse()
 

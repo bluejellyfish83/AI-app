@@ -18,11 +18,13 @@ export interface Conversation {
   updatedAt: Date
   systemPrompt: string
   modelId: string
+  contextSize: number
 }
 
 export interface GlobalDefaults {
   systemPrompt: string
   modelId: string
+  contextSize: number
   fontFamily: 'mono' | 'sans'
   fontSize: 'sm' | 'md' | 'lg'
 }
@@ -48,6 +50,7 @@ export default function ChatPage() {
   const [globalDefaults, setGlobalDefaults] = useState<GlobalDefaults>({
     systemPrompt: '',
     modelId: DEFAULT_MODEL_ID,
+    contextSize: 8,
     fontFamily: 'mono',
     fontSize: 'md',
   })
@@ -74,7 +77,7 @@ export default function ChatPage() {
     async function load() {
       const { data: chats, error } = await supabase
         .from('chats')
-        .select('id, title, model_id, system_prompt, updated_at, created_at')
+        .select('id, title, model_id, context_size, system_prompt, updated_at, created_at')
         .eq('user_id', userId)
         .order('updated_at', { ascending: false })
 
@@ -88,6 +91,7 @@ export default function ChatPage() {
           updatedAt: new Date(),
           systemPrompt: '',
           modelId: DEFAULT_MODEL_ID,
+          contextSize: 8,
         }
         setConversations([defaultConv])
         setActiveId(defaultConv.id)
@@ -105,7 +109,7 @@ export default function ChatPage() {
             model_id: DEFAULT_MODEL_ID,
             system_prompt: '',
           })
-          .select('id, title, model_id, system_prompt, updated_at, created_at')
+          .select('id, title, model_id, context_size, system_prompt, updated_at, created_at')
           .single()
 
         if (insertError || !newChat) {
@@ -117,6 +121,7 @@ export default function ChatPage() {
             updatedAt: new Date(),
             systemPrompt: '',
             modelId: DEFAULT_MODEL_ID,
+            contextSize: 8,
           }
           setConversations([fallbackConv])
           setActiveId(fallbackConv.id)
@@ -131,6 +136,7 @@ export default function ChatPage() {
           updatedAt: new Date(newChat.updated_at),
           systemPrompt: newChat.system_prompt ?? '',
           modelId: newChat.model_id ?? DEFAULT_MODEL_ID,
+          contextSize: newChat.context_size ?? 8,
         }
         setConversations([conv])
         setActiveId(conv.id)
@@ -146,6 +152,7 @@ export default function ChatPage() {
         updatedAt: new Date(c.updated_at),
         systemPrompt: c.system_prompt ?? '',
         modelId: c.model_id ?? DEFAULT_MODEL_ID,
+        contextSize: c.context_size ?? 8,
       }))
 
       setConversations(convs)
@@ -240,9 +247,10 @@ export default function ChatPage() {
         user_id: userId,
         title: 'New Chat',
         model_id: globalDefaults.modelId,
+        context_size: globalDefaults.contextSize,
         system_prompt: globalDefaults.systemPrompt,
       })
-      .select('id, title, model_id, system_prompt, updated_at, created_at')
+      .select('id, title, model_id, context_size, system_prompt, updated_at, created_at')
       .single()
 
     if (error || !newChat) {
@@ -257,6 +265,7 @@ export default function ChatPage() {
       updatedAt: new Date(newChat.updated_at),
       systemPrompt: newChat.system_prompt ?? '',
       modelId: newChat.model_id ?? DEFAULT_MODEL_ID,
+      contextSize: newChat.context_size ?? 8,
     }
 
     setConversations((prev) => [conv, ...prev])
@@ -470,7 +479,7 @@ export default function ChatPage() {
       </div>
 
       {/* Global defaults settings */}
-      <SettingsSheet
+        <SettingsSheet
         isOpen={globalSettingsOpen}
         onClose={() => setGlobalSettingsOpen(false)}
         title="Default Settings (New Chats)"
@@ -478,6 +487,8 @@ export default function ChatPage() {
         onSystemPromptChange={(v) => setGlobalDefaults((d) => ({ ...d, systemPrompt: v }))}
         modelId={globalDefaults.modelId}
         onModelChange={(id) => setGlobalDefaults((d) => ({ ...d, modelId: id }))}
+        contextSize={globalDefaults.contextSize}
+        onContextSizeChange={(v) => setGlobalDefaults((d) => ({ ...d, contextSize: v }))}
         fontFamily={globalDefaults.fontFamily}
         onFontFamilyChange={(f) => setGlobalDefaults((d) => ({ ...d, fontFamily: f }))}
         fontSize={globalDefaults.fontSize}
@@ -498,6 +509,11 @@ export default function ChatPage() {
         onModelChange={(id) => {
           updateActive((c) => ({ ...c, modelId: id }))
           supabase.from('chats').update({ model_id: id }).eq('id', active.id).then(() => {})
+        }}
+        contextSize={active.contextSize}
+        onContextSizeChange={(v) => {
+          updateActive((c) => ({ ...c, contextSize: v }))
+          supabase.from('chats').update({ context_size: v }).eq('id', active.id).then(() => {})
         }}
         fontFamily={globalDefaults.fontFamily}
         onFontFamilyChange={(f) => setGlobalDefaults((d) => ({ ...d, fontFamily: f }))}

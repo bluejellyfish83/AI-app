@@ -13,6 +13,8 @@ interface SettingsSheetProps {
   onSystemPromptChange: (v: string) => void
   modelId: string
   onModelChange: (id: string) => void
+  contextSize: number
+  onContextSizeChange: (v: number) => void
   fontFamily: 'mono' | 'sans'
   onFontFamilyChange: (f: 'mono' | 'sans') => void
   fontSize: 'sm' | 'md' | 'lg'
@@ -38,6 +40,8 @@ export function SettingsSheet({
   onSystemPromptChange,
   modelId,
   onModelChange,
+  contextSize,
+  onContextSizeChange,
   fontFamily,
   onFontFamilyChange,
   fontSize,
@@ -126,6 +130,53 @@ export function SettingsSheet({
             />
             <p className="text-[10px] font-mono text-white/20 mt-1">
               Sent as the first message to the model on every request.
+            </p>
+          </section>
+
+          {/* Context size */}
+          <section>
+            <label className="block text-[10px] font-mono text-white/35 uppercase tracking-widest mb-1.5">
+              Context Messages
+            </label>
+            <div
+              className="flex items-center gap-3 px-3 py-2.5 rounded-xl"
+              style={{
+                background: 'rgba(255,255,255,0.04)',
+                border: '1px solid rgba(255,255,255,0.08)',
+              }}
+            >
+              <input
+                type="range"
+                min={1}
+                max={50}
+                step={1}
+                value={contextSize}
+                onChange={(e) => onContextSizeChange(Number(e.target.value))}
+                className="flex-1 h-1 rounded-full appearance-none cursor-pointer"
+                style={{
+                  background: `linear-gradient(to right, #818cf8 0%, #818cf8 ${((contextSize - 1) / 49) * 100}%, rgba(255,255,255,0.1) ${((contextSize - 1) / 49) * 100}%, rgba(255,255,255,0.1) 100%)`,
+                  accentColor: '#818cf8',
+                }}
+                aria-label="Context messages count"
+              />
+              <input
+                type="number"
+                min={1}
+                max={50}
+                value={contextSize}
+                onChange={(e) => {
+                  const v = Number(e.target.value)
+                  if (v >= 1 && v <= 50) onContextSizeChange(v)
+                }}
+                className="w-12 text-center text-[11px] font-mono text-white/75 bg-transparent
+                  border border-white/[0.12] rounded-lg py-1 outline-none
+                  focus:border-indigo-400/50 transition-colors"
+                style={{ caretColor: '#818cf8' }}
+                aria-label="Context messages number"
+              />
+            </div>
+            <p className="text-[10px] font-mono text-white/20 mt-1">
+              Number of recent messages sent to the model with each request. Higher = more context, more cost.
             </p>
           </section>
 
