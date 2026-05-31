@@ -1,0 +1,260 @@
+'use client'
+
+import { useEffect, useRef } from 'react'
+import { X } from 'lucide-react'
+import { ModelPicker } from './model-picker'
+import { getModelById } from '@/lib/openrouter-models'
+
+interface SettingsSheetProps {
+  isOpen: boolean
+  onClose: () => void
+  title: string
+  systemPrompt: string
+  onSystemPromptChange: (v: string) => void
+  modelId: string
+  onModelChange: (id: string) => void
+  fontFamily: 'mono' | 'sans'
+  onFontFamilyChange: (f: 'mono' | 'sans') => void
+  fontSize: 'sm' | 'md' | 'lg'
+  onFontSizeChange: (s: 'sm' | 'md' | 'lg') => void
+}
+
+const FONTS: { value: 'mono' | 'sans'; label: string; description: string }[] = [
+  { value: 'mono', label: 'Geist Mono', description: 'Monospace — default' },
+  { value: 'sans', label: 'Geist', description: 'Sans-serif — clean & readable' },
+]
+
+const FONT_SIZES: { value: 'sm' | 'md' | 'lg'; label: string; px: string }[] = [
+  { value: 'sm', label: 'S', px: '10px' },
+  { value: 'md', label: 'M', px: '11px' },
+  { value: 'lg', label: 'L', px: '13px' },
+]
+
+export function SettingsSheet({
+  isOpen,
+  onClose,
+  title,
+  systemPrompt,
+  onSystemPromptChange,
+  modelId,
+  onModelChange,
+  fontFamily,
+  onFontFamilyChange,
+  fontSize,
+  onFontSizeChange,
+}: SettingsSheetProps) {
+  const overlayRef = useRef<HTMLDivElement>(null)
+  const currentModel = getModelById(modelId)
+
+  // Trap focus / close on Escape
+  useEffect(() => {
+    if (!isOpen) return
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [isOpen, onClose])
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div
+        ref={overlayRef}
+        className={`fixed inset-0 z-50 transition-opacity duration-300 ${
+          isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+        }`}
+        style={{ background: 'rgba(0,0,0,0.55)' }}
+        onClick={onClose}
+        aria-hidden="true"
+      />
+
+      {/* Sheet — slides up from bottom */}
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        className={`fixed bottom-0 left-0 right-0 z-50 flex flex-col
+          transition-transform duration-300 ease-out rounded-t-3xl max-h-[90dvh]
+          ${isOpen ? 'translate-y-0' : 'translate-y-full'}`}
+        style={{
+          background: 'rgba(8,8,18,0.95)',
+          backdropFilter: 'blur(48px) saturate(180%)',
+          WebkitBackdropFilter: 'blur(48px) saturate(180%)',
+          border: '1px solid rgba(255,255,255,0.08)',
+          borderBottom: 'none',
+        }}
+      >
+        {/* Handle + header */}
+        <div className="flex flex-col items-center pt-3 pb-0">
+          <div
+            className="w-9 h-1 rounded-full mb-4"
+            style={{ background: 'rgba(255,255,255,0.15)' }}
+            aria-hidden="true"
+          />
+          <div className="w-full flex items-center justify-between px-5 pb-3 border-b border-white/[0.07]">
+            <h2 className="text-[12px] font-mono font-semibold text-white/70">{title}</h2>
+            <button
+              onClick={onClose}
+              className="w-7 h-7 rounded-lg flex items-center justify-center
+                hover:bg-white/[0.08] transition-all duration-200"
+              style={{ color: '#d6cfc4', opacity: 0.5 }}
+              aria-label="Close settings"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Scrollable body */}
+        <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-5">
+          {/* System prompt */}
+          <section>
+            <label className="block text-[10px] font-mono text-white/35 uppercase tracking-widest mb-1.5">
+              System Prompt
+            </label>
+            <textarea
+              value={systemPrompt}
+              onChange={(e) => onSystemPromptChange(e.target.value)}
+              placeholder="You are a helpful assistant…"
+              rows={5}
+              className="w-full resize-none rounded-xl px-3 py-2.5 text-[11px] font-mono
+                text-white/75 placeholder:text-white/20 outline-none leading-relaxed"
+              style={{
+                background: 'rgba(255,255,255,0.04)',
+                border: '1px solid rgba(255,255,255,0.08)',
+                caretColor: '#818cf8',
+              }}
+            />
+            <p className="text-[10px] font-mono text-white/20 mt-1">
+              Sent as the first message to the model on every request.
+            </p>
+          </section>
+
+          {/* Font family + size */}
+          <section className="flex flex-col gap-3">
+            <div>
+              <label className="block text-[10px] font-mono text-white/35 uppercase tracking-widest mb-1.5">
+                Font
+              </label>
+              <div className="flex gap-2">
+                {FONTS.map((f) => {
+                  const isActive = fontFamily === f.value
+                  return (
+                    <button
+                      key={f.value}
+                      onClick={() => onFontFamilyChange(f.value)}
+                      className="flex-1 flex flex-col gap-0.5 px-3 py-2.5 rounded-xl text-left transition-all duration-200"
+                      style={{
+                        background: isActive ? 'rgba(79,70,229,0.15)' : 'rgba(255,255,255,0.04)',
+                        border: isActive
+                          ? '1px solid rgba(99,72,219,0.35)'
+                          : '1px solid rgba(255,255,255,0.07)',
+                      }}
+                    >
+                      <span
+                        className={`text-[11px] font-medium ${f.value === 'mono' ? 'font-mono' : 'font-sans'}`}
+                        style={{ color: isActive ? '#818cf8' : '#d6cfc4' }}
+                      >
+                        {f.label}
+                      </span>
+                      <span className="text-[10px] font-mono text-white/25">{f.description}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-mono text-white/35 uppercase tracking-widest mb-1.5">
+                Size
+              </label>
+              <div className="flex gap-2">
+                {FONT_SIZES.map((s) => {
+                  const isActive = fontSize === s.value
+                  return (
+                    <button
+                      key={s.value}
+                      onClick={() => onFontSizeChange(s.value)}
+                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl transition-all duration-200"
+                      style={{
+                        background: isActive ? 'rgba(79,70,229,0.15)' : 'rgba(255,255,255,0.04)',
+                        border: isActive
+                          ? '1px solid rgba(99,72,219,0.35)'
+                          : '1px solid rgba(255,255,255,0.07)',
+                      }}
+                    >
+                      <span
+                        className="font-mono font-medium"
+                        style={{
+                          fontSize: s.px,
+                          color: isActive ? '#818cf8' : '#d6cfc4',
+                        }}
+                      >
+                        {s.label}
+                      </span>
+                      <span className="text-[10px] font-mono" style={{ color: isActive ? '#818cf8' : 'rgba(255,255,255,0.2)' }}>
+                        {s.px}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          </section>
+
+          {/* Model picker */}
+          <section>
+            <label className="block text-[10px] font-mono text-white/35 uppercase tracking-widest mb-1.5">
+              Model
+            </label>
+            <div
+              className="px-3 py-2 rounded-xl mb-2"
+              style={{
+                background: 'rgba(79,70,229,0.10)',
+                border: '1px solid rgba(99,72,219,0.20)',
+              }}
+            >
+              <span className="text-[11px] font-mono text-indigo-300">{currentModel.name}</span>
+              <span className="text-[10px] font-mono text-white/25 ml-2">{currentModel.provider}</span>
+            </div>
+            <ModelPicker value={modelId} onChange={onModelChange} />
+          </section>
+
+          {/* Integration instructions */}
+          <section>
+            <label className="block text-[10px] font-mono text-white/35 uppercase tracking-widest mb-1.5">
+              Integration
+            </label>
+            <div
+              className="px-3 py-3 rounded-xl"
+              style={{
+                background: 'rgba(255,255,255,0.03)',
+                border: '1px solid rgba(255,255,255,0.07)',
+              }}
+            >
+              <p className="text-[10px] font-mono text-white/35 leading-relaxed">
+                {'To connect OpenRouter:'}
+              </p>
+              <ol className="mt-1.5 flex flex-col gap-1">
+                {[
+                  'Add OPENROUTER_API_KEY to your environment variables.',
+                  'Create app/api/chat/route.ts — proxy POST to https://openrouter.ai/api/v1/chat/completions with the model ID, system prompt, and messages.',
+                  "In page.tsx, replace the setTimeout stub in sendMessage with fetch('/api/chat', { model, systemPrompt, messages }).",
+                  'Stream the response with ReadableStream or use the AI SDK streamText helper.',
+                ].map((step, i) => (
+                  <li key={i} className="flex gap-2">
+                    <span className="text-[10px] font-mono text-indigo-400/50 shrink-0">
+                      {i + 1}.
+                    </span>
+                    <span className="text-[10px] font-mono text-white/30 leading-relaxed">
+                      {step}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          </section>
+        </div>
+      </div>
+    </>
+  )
+}
