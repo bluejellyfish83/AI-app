@@ -1,12 +1,13 @@
 'use client'
 
 import { useRef, useCallback, useEffect, KeyboardEvent } from 'react'
-import { ArrowUp, ArrowDown, Paperclip, Mic } from 'lucide-react'
+import { ArrowUp, ArrowDown, Paperclip, Mic, Square } from 'lucide-react'
 
 interface ChatInputBarProps {
   value: string
   onChange: (value: string) => void
   onSend: () => void
+  onStop?: () => void
   isLoading?: boolean
   hasMessages?: boolean
   onScrollToLatest?: () => void
@@ -21,6 +22,7 @@ export function ChatInputBar({
   value,
   onChange,
   onSend,
+  onStop,
   isLoading = false,
   hasMessages = false,
   onScrollToLatest,
@@ -151,38 +153,48 @@ export function ChatInputBar({
               </button>
             )}
 
-            <button
-              onClick={onSend}
-              disabled={!canSend}
-              className="w-7 h-7 rounded-xl flex items-center justify-center
-                transition-all duration-200 active:scale-90"
-              style={
-                canSend
-                  ? {
-                      background: 'linear-gradient(135deg, #3730a3, #4f46e5)',
-                      boxShadow: '0 2px 12px rgba(79,70,229,0.55)',
-                      border: '1px solid rgba(129,140,248,0.3)',
-                    }
-                  : {
-                      background: 'rgba(255,255,255,0.06)',
-                      border: '1px solid rgba(255,255,255,0.07)',
-                    }
-              }
-              aria-label="Send message"
-              type="button"
-            >
-              {isLoading ? (
-                <span
-                  className="w-3 h-3 rounded-full border-2 border-white/40 border-t-white/80 animate-spin"
-                  aria-hidden="true"
-                />
-              ) : (
+            {isLoading && onStop ? (
+              <button
+                onClick={onStop}
+                className="w-7 h-7 rounded-xl flex items-center justify-center
+                  transition-all duration-200 active:scale-90"
+                style={{
+                  background: 'linear-gradient(135deg, #3730a3, #4f46e5)',
+                  boxShadow: '0 2px 12px rgba(79,70,229,0.55)',
+                  border: '1px solid rgba(129,140,248,0.3)',
+                }}
+                aria-label="Stop generating"
+                type="button"
+              >
+                <Square className="w-2.5 h-2.5 fill-white" style={{ color: '#fff' }} />
+              </button>
+            ) : (
+              <button
+                onClick={onSend}
+                disabled={!canSend}
+                className="w-7 h-7 rounded-xl flex items-center justify-center
+                  transition-all duration-200 active:scale-90"
+                style={
+                  canSend
+                    ? {
+                        background: 'linear-gradient(135deg, #3730a3, #4f46e5)',
+                        boxShadow: '0 2px 12px rgba(79,70,229,0.55)',
+                        border: '1px solid rgba(129,140,248,0.3)',
+                      }
+                    : {
+                        background: 'rgba(255,255,255,0.06)',
+                        border: '1px solid rgba(255,255,255,0.07)',
+                      }
+                }
+                aria-label="Send message"
+                type="button"
+              >
                 <ArrowUp
                   className="w-3 h-3"
                   style={{ color: canSend ? '#fff' : 'rgba(255,255,255,0.25)' }}
                 />
-              )}
-            </button>
+              </button>
+            )}
           </div>
         </div>
       </div>

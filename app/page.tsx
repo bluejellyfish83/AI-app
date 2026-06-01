@@ -65,6 +65,7 @@ export default function ChatPage() {
   const [isLoaded, setIsLoaded] = useState(false)
 
   const messagesRef = useRef<ChatMessagesHandle>(null)
+  const abortRef = useRef<AbortController | null>(null)
   const supabase = useRef(createBrowserClient()).current
 
   const active = conversations.find((c) => c.id === activeId) ?? conversations[0]
@@ -283,6 +284,42 @@ export default function ChatPage() {
     [],
   )
 
+  const handleDeleteConversation = useCallback(
+    async (id: string) => {
+      // Delete from Supabase (messages cascade)
+      await supabase.from('chats').delete().eq('id', id)
+
+      // Remove from local state
+      setConversations((prev) => {
+        const remaining = prev.filter((c) => c.id !== id)
+
+        // If we deleted the active chat, switch to the next one
+        if (id === activeId) {
+          if (remaining.length > 0) {
+            setActiveId(remaining[0].id)
+          } else {
+            // No chats left — create a new one
+            handleNewConversation()
+          }
+        }
+
+        return remaining
+      })
+
+      // Clean up loaded chats cache
+      loadedChatsRef.current.delete(id)
+    },
+    [activeId, supabase, handleNewConversation],
+  )
+
+  const handleStopStreaming = useCallback(() => {
+    if (abortRef.current) {
+      abortRef.current.abort()
+      abortRef.current = null
+    }
+    setIsLoading(false)
+  }, [])
+
   const sendMessage = useCallback(async () => {
     const text = input.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim()
     if (!text || isLoading || !active) return
@@ -307,6 +344,10 @@ export default function ChatPage() {
     setInput('')
     setIsLoading(true)
 
+    // Create abort controller for this request
+    const controller = new AbortController()
+    abortRef.current = controller
+
     // Auto-title: update Supabase after first message
     if (isFirst) {
       const autoTitle = text.slice(0, 32) + (text.length > 32 ? '…' : '')
@@ -325,6 +366,7 @@ export default function ChatPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ chatId: active.id, content: text }),
+        signal: controller.signal,
       })
 
       if (!res.ok) {
@@ -400,16 +442,21 @@ export default function ChatPage() {
         }
       }
     } catch (err) {
-      console.error('Streaming error:', err)
-      // Add error message as AI response
-      const errorMsg: Message = {
-        id: crypto.randomUUID(),
-        role: 'ai',
-        content: 'Something went wrong. Please try again.',
-        timestamp: new Date(),
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        // User stopped streaming — keep partial content, no error message
+        console.log('Streaming stopped by user')
+      } else {
+        console.error('Streaming error:', err)
+        const errorMsg: Message = {
+          id: crypto.randomUUID(),
+          role: 'ai',
+          content: 'Something went wrong. Please try again.',
+          timestamp: new Date(),
+        }
+        updateActive((c) => ({ ...c, messages: [...c.messages, errorMsg] }))
       }
-      updateActive((c) => ({ ...c, messages: [...c.messages, errorMsg] }))
     } finally {
+      abortRef.current = null
       setIsLoading(false)
     }
   }, [input, isLoading, active, updateActive, supabase])
@@ -445,6 +492,7 @@ export default function ChatPage() {
         activeId={activeId}
         onSelect={handleSelectConversation}
         onNew={handleNewConversation}
+        onDelete={handleDeleteConversation}
         onOpenGlobalSettings={() => {
           setSidebarOpen(false)
           setGlobalSettingsOpen(true)
@@ -483,6 +531,7 @@ export default function ChatPage() {
           value={input}
           onChange={setInput}
           onSend={sendMessage}
+          onStop={handleStopStreaming}
           isLoading={isLoading}
           hasMessages={active.messages.length > 0}
           onScrollToLatest={() => messagesRef.current?.scrollToLatestUser()}
