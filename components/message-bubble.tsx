@@ -1,5 +1,8 @@
 'use client'
 
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
+
 export type MessageRole = 'user' | 'ai'
 
 export interface Message {
@@ -34,7 +37,7 @@ export function DateSeparator({ label }: { label: string }) {
   return (
     <div className="flex justify-center my-1" aria-label={`Messages from ${label}`}>
       <span
-        className="px-3 py-0.5 rounded-full text-[10px] tracking-wide text-white/30"
+        className="px-3 py-0.5 rounded-full text-[10px] tracking-wide text-white/42"
         style={{
           background: 'rgba(255,255,255,0.04)',
           border: '1px solid rgba(255,255,255,0.07)',
@@ -58,7 +61,7 @@ export function UserBubble({ message }: MessageBubbleProps) {
           {message.content}
         </div>
       </div>
-      <span className="text-[10px] text-white/28 pr-0.5 tabular-nums">
+      <span className="text-[10px] text-white/38 pr-0.5 tabular-nums">
         {formatTime(message.timestamp)}
       </span>
     </div>
@@ -67,13 +70,15 @@ export function UserBubble({ message }: MessageBubbleProps) {
 
 export function AIBubble({ message }: MessageBubbleProps) {
   return (
-    <div className="w-full flex justify-start py-1">
-      <p
-        className="leading-[1.7] text-white/80 whitespace-pre-wrap break-words w-full"
+    <div className="w-full text-left py-1">
+      <div
+        className="markdown-body"
         style={{ fontSize: 'var(--chat-font-size, 11px)' }}
       >
-        {message.content}
-      </p>
+        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+          {message.content}
+        </ReactMarkdown>
+      </div>
     </div>
   )
 }

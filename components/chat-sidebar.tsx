@@ -97,7 +97,7 @@ export function ChatSidebar({
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search conversations…"
                 className="flex-1 bg-transparent border-none outline-none text-[11px]
-                  text-white/70 placeholder:text-white/25 font-mono"
+                  text-white/70 placeholder:text-white/35 font-mono"
                 aria-label="Search conversations"
               />
               {/* Single clear button — only when there is a query */}
@@ -153,7 +153,7 @@ export function ChatSidebar({
               >
                 <MessageSquare style={{ width: '18px', height: '18px', color: '#d6cfc4', opacity: 0.2 }} />
               </div>
-              <p className="text-[11px] text-white/25 text-center leading-relaxed font-mono">
+              <p className="text-[11px] text-white/35 text-center leading-relaxed font-mono">
                 {query ? 'No matches found.' : 'No conversations yet.\nStart a new chat above.'}
               </p>
             </div>
@@ -185,12 +185,12 @@ export function ChatSidebar({
                         </span>
                         <span
                           className="text-[10px] font-mono shrink-0"
-                          style={{ color: '#d6cfc4', opacity: 0.3 }}
+                          style={{ color: '#d6cfc4', opacity: 0.45 }}
                         >
                           {formatRelativeTime(conv.updatedAt)}
                         </span>
                       </div>
-                      <span className="text-[10px] font-mono text-white/25 truncate leading-relaxed">
+                      <span className="text-[10px] font-mono text-white/35 truncate leading-relaxed">
                         {preview}
                       </span>
                     </button>

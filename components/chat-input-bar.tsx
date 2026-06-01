@@ -10,6 +10,8 @@ interface ChatInputBarProps {
   isLoading?: boolean
   hasMessages?: boolean
   onScrollToLatest?: () => void
+  fontSize?: number
+  fontFamily?: 'mono' | 'sans'
 }
 
 const MAX_ROWS = 6
@@ -22,6 +24,8 @@ export function ChatInputBar({
   isLoading = false,
   hasMessages = false,
   onScrollToLatest,
+  fontSize = 11,
+  fontFamily = 'mono',
 }: ChatInputBarProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -106,10 +110,11 @@ export function ChatInputBar({
             onKeyDown={handleKeyDown}
             placeholder="Message…"
             rows={1}
-            className="w-full resize-none bg-transparent border-none outline-none
-              text-[11px] leading-[18px] text-white/85 placeholder:text-white/25
-              min-h-[18px] scrollbar-none font-mono"
+            className={`w-full resize-none bg-transparent border-none outline-none
+              leading-[18px] text-white/85 placeholder:text-white/25
+              min-h-[18px] scrollbar-none ${fontFamily === 'sans' ? 'font-sans' : 'font-mono'}`}
             style={{
+              fontSize: `${fontSize}px`,
               lineHeight: `${LINE_HEIGHT}px`,
               caretColor: '#818cf8',
             }}

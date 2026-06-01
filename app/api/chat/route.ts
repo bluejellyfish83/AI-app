@@ -114,14 +114,15 @@ export async function POST(req: Request) {
             const text = chunk.choices[0]?.delta?.content ?? ''
             if (text) {
               assistantContent += text
-              controller.enqueue(encoder.encode(`data: ${text}\n\n`))
+              // JSON-encode to preserve newlines in SSE payload
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify(text)}\n\n`))
             }
           }
           controller.enqueue(encoder.encode('data: [DONE]\n\n'))
           controller.close()
         } catch (err) {
           console.error('Stream error:', err)
-          controller.enqueue(encoder.encode(`data: [Error: streaming failed]\n\n`))
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify('[Error: streaming failed]')}\n\n`))
           controller.enqueue(encoder.encode('data: [DONE]\n\n'))
           controller.close()
         }

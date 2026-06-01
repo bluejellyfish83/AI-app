@@ -26,7 +26,7 @@ export interface GlobalDefaults {
   modelId: string
   contextSize: number
   fontFamily: 'mono' | 'sans'
-  fontSize: 'sm' | 'md' | 'lg'
+  fontSize: number
 }
 
 /** Get or create a persistent user ID in localStorage */
@@ -52,7 +52,7 @@ export default function ChatPage() {
     modelId: DEFAULT_MODEL_ID,
     contextSize: 8,
     fontFamily: 'mono',
-    fontSize: 'md',
+    fontSize: 11,
   })
 
   const [conversations, setConversations] = useState<Conversation[]>([])
@@ -363,7 +363,12 @@ export default function ChatPage() {
           if (!trimmed.startsWith('data: ')) continue
           const payload = trimmed.slice(6) // Remove "data: " prefix
           if (payload === '[DONE]') continue
-          aiContent += payload
+          try {
+            // JSON-decode to restore newlines
+            aiContent += JSON.parse(payload)
+          } catch {
+            aiContent += payload
+          }
         }
 
         // Update the placeholder message content (typewriter effect)
@@ -380,7 +385,11 @@ export default function ChatPage() {
       // Process any remaining buffer
       const remaining = buffer.trim()
       if (remaining.startsWith('data: ') && !remaining.startsWith('data: [DONE]')) {
-        aiContent += remaining.slice(6)
+        try {
+          aiContent += JSON.parse(remaining.slice(6))
+        } catch {
+          aiContent += remaining.slice(6)
+        }
         if (aiContent) {
           updateActive((c) => ({
             ...c,
@@ -408,7 +417,7 @@ export default function ChatPage() {
   // Show loading state while initial data loads
   if (!isLoaded || !active) {
     return (
-      <div className="relative flex flex-col h-[100dvh] overflow-hidden bg-[#030308]">
+      <div className={`relative flex flex-col h-[100dvh] overflow-hidden bg-[#030308] ${globalDefaults.fontFamily === 'sans' ? 'font-sans' : 'font-mono'}`}>
         <AmbientOrbs />
         <div className="flex-1 flex items-center justify-center">
           <div className="flex gap-1.5 items-center h-4">
@@ -426,7 +435,7 @@ export default function ChatPage() {
   }
 
   return (
-    <div className="relative flex flex-col h-[100dvh] overflow-hidden bg-[#030308]">
+    <div className={`relative flex flex-col h-[100dvh] overflow-hidden bg-[#030308] ${globalDefaults.fontFamily === 'sans' ? 'font-sans' : 'font-mono'}`}>
       <AmbientOrbs />
 
       <ChatSidebar
@@ -447,14 +456,16 @@ export default function ChatPage() {
         title={active.title}
         onRename={renameConversation}
         onOpenConvSettings={() => setConvSettingsOpen(true)}
+        fontSize={globalDefaults.fontSize}
+        fontFamily={globalDefaults.fontFamily}
       />
 
       <main
-        className={`relative z-10 flex flex-col flex-1 overflow-hidden ${globalDefaults.fontFamily === 'sans' ? 'font-sans' : 'font-mono'}`}
+        className="relative z-10 flex flex-col flex-1 overflow-hidden"
         style={{
           paddingTop: '48px',
           paddingBottom: '96px',
-          '--chat-font-size': globalDefaults.fontSize === 'sm' ? '10px' : globalDefaults.fontSize === 'lg' ? '13px' : '11px',
+          '--chat-font-size': `${globalDefaults.fontSize}px`,
         } as React.CSSProperties}
       >
         <ChatMessages
@@ -475,6 +486,8 @@ export default function ChatPage() {
           isLoading={isLoading}
           hasMessages={active.messages.length > 0}
           onScrollToLatest={() => messagesRef.current?.scrollToLatestUser()}
+          fontSize={globalDefaults.fontSize}
+          fontFamily={globalDefaults.fontFamily}
         />
       </div>
 
@@ -495,7 +508,7 @@ export default function ChatPage() {
         onFontSizeChange={(s) => setGlobalDefaults((d) => ({ ...d, fontSize: s }))}
       />
 
-      {/* Per-conversation settings */}
+      {/* Per-conversation settings — no font controls (those are global-only) */}
       <SettingsSheet
         isOpen={convSettingsOpen}
         onClose={() => setConvSettingsOpen(false)}
@@ -515,10 +528,6 @@ export default function ChatPage() {
           updateActive((c) => ({ ...c, contextSize: v }))
           supabase.from('chats').update({ context_size: v }).eq('id', active.id).then(() => {})
         }}
-        fontFamily={globalDefaults.fontFamily}
-        onFontFamilyChange={(f) => setGlobalDefaults((d) => ({ ...d, fontFamily: f }))}
-        fontSize={globalDefaults.fontSize}
-        onFontSizeChange={(s) => setGlobalDefaults((d) => ({ ...d, fontSize: s }))}
       />
     </div>
   )

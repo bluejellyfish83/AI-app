@@ -15,21 +15,15 @@ interface SettingsSheetProps {
   onModelChange: (id: string) => void
   contextSize: number
   onContextSizeChange: (v: number) => void
-  fontFamily: 'mono' | 'sans'
-  onFontFamilyChange: (f: 'mono' | 'sans') => void
-  fontSize: 'sm' | 'md' | 'lg'
-  onFontSizeChange: (s: 'sm' | 'md' | 'lg') => void
+  fontFamily?: 'mono' | 'sans'
+  onFontFamilyChange?: (f: 'mono' | 'sans') => void
+  fontSize?: number
+  onFontSizeChange?: (s: number) => void
 }
 
 const FONTS: { value: 'mono' | 'sans'; label: string; description: string }[] = [
   { value: 'mono', label: 'Geist Mono', description: 'Monospace — default' },
   { value: 'sans', label: 'Geist', description: 'Sans-serif — clean & readable' },
-]
-
-const FONT_SIZES: { value: 'sm' | 'md' | 'lg'; label: string; px: string }[] = [
-  { value: 'sm', label: 'S', px: '10px' },
-  { value: 'md', label: 'M', px: '11px' },
-  { value: 'lg', label: 'L', px: '13px' },
 ]
 
 export function SettingsSheet({
@@ -95,7 +89,7 @@ export function SettingsSheet({
             aria-hidden="true"
           />
           <div className="w-full flex items-center justify-between px-5 pb-3 border-b border-white/[0.07]">
-            <h2 className="text-[12px] font-mono font-semibold text-white/70">{title}</h2>
+            <h2 className="text-[12px] font-semibold text-white/70">{title}</h2>
             <button
               onClick={onClose}
               className="w-7 h-7 rounded-lg flex items-center justify-center
@@ -112,7 +106,7 @@ export function SettingsSheet({
         <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-5">
           {/* System prompt */}
           <section>
-            <label className="block text-[10px] font-mono text-white/35 uppercase tracking-widest mb-1.5">
+            <label className="block text-[10px] text-white/45 uppercase tracking-widest mb-1.5">
               System Prompt
             </label>
             <textarea
@@ -120,22 +114,22 @@ export function SettingsSheet({
               onChange={(e) => onSystemPromptChange(e.target.value)}
               placeholder="You are a helpful assistant…"
               rows={5}
-              className="w-full resize-none rounded-xl px-3 py-2.5 text-[11px] font-mono
-                text-white/75 placeholder:text-white/20 outline-none leading-relaxed"
+              className="w-full resize-none rounded-xl px-3 py-2.5 text-[11px]
+                text-white/75 placeholder:text-white/20 outline-none leading-relaxed font-mono"
               style={{
                 background: 'rgba(255,255,255,0.04)',
                 border: '1px solid rgba(255,255,255,0.08)',
                 caretColor: '#818cf8',
               }}
             />
-            <p className="text-[10px] font-mono text-white/20 mt-1">
+            <p className="text-[10px] text-white/30 mt-1">
               Sent as the first message to the model on every request.
             </p>
           </section>
 
           {/* Context size */}
           <section>
-            <label className="block text-[10px] font-mono text-white/35 uppercase tracking-widest mb-1.5">
+            <label className="block text-[10px] text-white/45 uppercase tracking-widest mb-1.5">
               Context Messages
             </label>
             <div
@@ -148,13 +142,13 @@ export function SettingsSheet({
               <input
                 type="range"
                 min={1}
-                max={50}
+                max={500}
                 step={1}
                 value={contextSize}
                 onChange={(e) => onContextSizeChange(Number(e.target.value))}
                 className="flex-1 h-1 rounded-full appearance-none cursor-pointer"
                 style={{
-                  background: `linear-gradient(to right, #818cf8 0%, #818cf8 ${((contextSize - 1) / 49) * 100}%, rgba(255,255,255,0.1) ${((contextSize - 1) / 49) * 100}%, rgba(255,255,255,0.1) 100%)`,
+                  background: `linear-gradient(to right, #818cf8 0%, #818cf8 ${((contextSize - 1) / 499) * 100}%, rgba(255,255,255,0.1) ${((contextSize - 1) / 499) * 100}%, rgba(255,255,255,0.1) 100%)`,
                   accentColor: '#818cf8',
                 }}
                 aria-label="Context messages count"
@@ -162,99 +156,110 @@ export function SettingsSheet({
               <input
                 type="number"
                 min={1}
-                max={50}
+                max={500}
                 value={contextSize}
                 onChange={(e) => {
                   const v = Number(e.target.value)
-                  if (v >= 1 && v <= 50) onContextSizeChange(v)
+                  if (v >= 1 && v <= 500) onContextSizeChange(v)
                 }}
-                className="w-12 text-center text-[11px] font-mono text-white/75 bg-transparent
+                  className="w-12 text-center text-[11px] text-white/75 bg-transparent
                   border border-white/[0.12] rounded-lg py-1 outline-none
                   focus:border-indigo-400/50 transition-colors"
                 style={{ caretColor: '#818cf8' }}
                 aria-label="Context messages number"
               />
             </div>
-            <p className="text-[10px] font-mono text-white/20 mt-1">
+            <p className="text-[10px] text-white/30 mt-1">
               Number of recent messages sent to the model with each request. Higher = more context, more cost.
             </p>
           </section>
 
-          {/* Font family + size */}
-          <section className="flex flex-col gap-3">
-            <div>
-              <label className="block text-[10px] font-mono text-white/35 uppercase tracking-widest mb-1.5">
-                Font
-              </label>
-              <div className="flex gap-2">
-                {FONTS.map((f) => {
-                  const isActive = fontFamily === f.value
-                  return (
-                    <button
-                      key={f.value}
-                      onClick={() => onFontFamilyChange(f.value)}
-                      className="flex-1 flex flex-col gap-0.5 px-3 py-2.5 rounded-xl text-left transition-all duration-200"
-                      style={{
-                        background: isActive ? 'rgba(79,70,229,0.15)' : 'rgba(255,255,255,0.04)',
-                        border: isActive
-                          ? '1px solid rgba(99,72,219,0.35)'
-                          : '1px solid rgba(255,255,255,0.07)',
-                      }}
-                    >
-                      <span
-                        className={`text-[11px] font-medium ${f.value === 'mono' ? 'font-mono' : 'font-sans'}`}
-                        style={{ color: isActive ? '#818cf8' : '#d6cfc4' }}
-                      >
-                        {f.label}
-                      </span>
-                      <span className="text-[10px] font-mono text-white/25">{f.description}</span>
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-[10px] font-mono text-white/35 uppercase tracking-widest mb-1.5">
-                Size
-              </label>
-              <div className="flex gap-2">
-                {FONT_SIZES.map((s) => {
-                  const isActive = fontSize === s.value
-                  return (
-                    <button
-                      key={s.value}
-                      onClick={() => onFontSizeChange(s.value)}
-                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl transition-all duration-200"
-                      style={{
-                        background: isActive ? 'rgba(79,70,229,0.15)' : 'rgba(255,255,255,0.04)',
-                        border: isActive
-                          ? '1px solid rgba(99,72,219,0.35)'
-                          : '1px solid rgba(255,255,255,0.07)',
-                      }}
-                    >
-                      <span
-                        className="font-mono font-medium"
+          {/* Font family + size — only shown when props are provided */}
+          {fontFamily !== undefined && onFontFamilyChange && (
+            <section className="flex flex-col gap-3">
+              <div>
+                <label className="block text-[10px] text-white/45 uppercase tracking-widest mb-1.5">
+                  Font
+                </label>
+                <div className="flex gap-2">
+                  {FONTS.map((f) => {
+                    const isActive = fontFamily === f.value
+                    return (
+                      <button
+                        key={f.value}
+                        onClick={() => onFontFamilyChange(f.value)}
+                        className="flex-1 flex flex-col gap-0.5 px-3 py-2.5 rounded-xl text-left transition-all duration-200"
                         style={{
-                          fontSize: s.px,
-                          color: isActive ? '#818cf8' : '#d6cfc4',
+                          background: isActive ? 'rgba(79,70,229,0.15)' : 'rgba(255,255,255,0.04)',
+                          border: isActive
+                            ? '1px solid rgba(99,72,219,0.35)'
+                            : '1px solid rgba(255,255,255,0.07)',
                         }}
                       >
-                        {s.label}
-                      </span>
-                      <span className="text-[10px] font-mono" style={{ color: isActive ? '#818cf8' : 'rgba(255,255,255,0.2)' }}>
-                        {s.px}
-                      </span>
-                    </button>
-                  )
-                })}
+                        <span
+                          className={`text-[11px] font-medium ${f.value === 'mono' ? 'font-mono' : 'font-sans'}`}
+                          style={{ color: isActive ? '#818cf8' : '#d6cfc4' }}
+                        >
+                          {f.label}
+                        </span>
+                        <span className="text-[10px] text-white/35">{f.description}</span>
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
-            </div>
-          </section>
+
+              {fontSize !== undefined && onFontSizeChange && (
+                <div>
+                  <label className="block text-[10px] text-white/45 uppercase tracking-widest mb-1.5">
+                    Font Size
+                  </label>
+                  <div
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-xl"
+                    style={{
+                      background: 'rgba(255,255,255,0.04)',
+                      border: '1px solid rgba(255,255,255,0.08)',
+                    }}
+                  >
+                    <input
+                      type="range"
+                      min={10}
+                      max={20}
+                      step={1}
+                      value={fontSize}
+                      onChange={(e) => onFontSizeChange(Number(e.target.value))}
+                      className="flex-1 h-1 rounded-full appearance-none cursor-pointer"
+                      style={{
+                        background: `linear-gradient(to right, #818cf8 0%, #818cf8 ${((fontSize - 10) / 10) * 100}%, rgba(255,255,255,0.1) ${((fontSize - 10) / 10) * 100}%, rgba(255,255,255,0.1) 100%)`,
+                        accentColor: '#818cf8',
+                      }}
+                      aria-label="Font size"
+                    />
+                    <input
+                      type="number"
+                      min={10}
+                      max={20}
+                      value={fontSize}
+                      onChange={(e) => {
+                        const v = Number(e.target.value)
+                        if (v >= 10 && v <= 20) onFontSizeChange(v)
+                      }}
+                      className="w-12 text-center text-[11px] text-white/75 bg-transparent
+                        border border-white/[0.12] rounded-lg py-1 outline-none
+                        focus:border-indigo-400/50 transition-colors"
+                      style={{ caretColor: '#818cf8' }}
+                      aria-label="Font size number"
+                    />
+                    <span className="text-[10px] text-white/25">px</span>
+                  </div>
+                </div>
+              )}
+            </section>
+          )}
 
           {/* Model picker */}
           <section>
-            <label className="block text-[10px] font-mono text-white/35 uppercase tracking-widest mb-1.5">
+            <label className="block text-[10px] text-white/45 uppercase tracking-widest mb-1.5">
               Model
             </label>
             <div
@@ -264,15 +269,15 @@ export function SettingsSheet({
                 border: '1px solid rgba(99,72,219,0.20)',
               }}
             >
-              <span className="text-[11px] font-mono text-indigo-300">{currentModel.name}</span>
-              <span className="text-[10px] font-mono text-white/25 ml-2">{currentModel.provider}</span>
+                <span className="text-[11px] text-indigo-300">{currentModel.name}</span>
+              <span className="text-[10px] text-white/35 ml-2">{currentModel.provider}</span>
             </div>
             <ModelPicker value={modelId} onChange={onModelChange} />
           </section>
 
           {/* Integration instructions */}
           <section>
-            <label className="block text-[10px] font-mono text-white/35 uppercase tracking-widest mb-1.5">
+            <label className="block text-[10px] text-white/45 uppercase tracking-widest mb-1.5">
               Integration
             </label>
             <div
@@ -282,7 +287,7 @@ export function SettingsSheet({
                 border: '1px solid rgba(255,255,255,0.07)',
               }}
             >
-              <p className="text-[10px] font-mono text-white/35 leading-relaxed">
+              <p className="text-[10px] text-white/45 leading-relaxed">
                 {'To connect OpenRouter:'}
               </p>
               <ol className="mt-1.5 flex flex-col gap-1">
@@ -293,10 +298,10 @@ export function SettingsSheet({
                   'Stream the response with ReadableStream or use the AI SDK streamText helper.',
                 ].map((step, i) => (
                   <li key={i} className="flex gap-2">
-                    <span className="text-[10px] font-mono text-indigo-400/50 shrink-0">
+                    <span className="text-[10px] text-indigo-400/70 shrink-0">
                       {i + 1}.
                     </span>
-                    <span className="text-[10px] font-mono text-white/30 leading-relaxed">
+                    <span className="text-[10px] text-white/40 leading-relaxed">
                       {step}
                     </span>
                   </li>

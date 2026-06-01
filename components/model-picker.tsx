@@ -71,14 +71,14 @@ export function ModelPicker({ value, onChange }: ModelPickerProps) {
           border: '1px solid rgba(255,255,255,0.08)',
         }}
       >
-        <Search className="w-3 h-3 shrink-0" style={{ color: '#d6cfc4', opacity: 0.4 }} />
+        <Search className="w-3 h-3 shrink-0" style={{ color: '#d6cfc4', opacity: 0.55 }} />
         <input
           type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search models…"
-          className="flex-1 bg-transparent border-none outline-none text-[11px]
-            text-white/70 placeholder:text-white/25 font-mono"
+            placeholder="Search models…"
+           className="flex-1 bg-transparent border-none outline-none text-[11px]
+             text-white/70 placeholder:text-white/35"
         />
         <button
           onClick={handleRefresh}
@@ -96,18 +96,18 @@ export function ModelPicker({ value, onChange }: ModelPickerProps) {
       </div>
 
       {/* Model count hint */}
-      <p className="text-[9px] font-mono text-white/20 px-1">
+       <p className="text-[9px] text-white/30 px-1">
         {isLive ? `${modelCount} models (live from OpenRouter)` : `${modelCount} built-in models`}
       </p>
 
       {/* Grouped list */}
       <div className="flex flex-col gap-3 max-h-[320px] overflow-y-auto pr-0.5">
         {providers.length === 0 && (
-          <p className="text-[11px] text-white/25 font-mono text-center py-6">No models match.</p>
+           <p className="text-[11px] text-white/35 text-center py-6">No models match.</p>
         )}
         {providers.map((provider) => (
           <div key={provider}>
-            <p className="text-[10px] font-mono text-white/30 uppercase tracking-widest mb-1 px-1">
+             <p className="text-[10px] text-white/40 uppercase tracking-widest mb-1 px-1">
               {provider}
             </p>
             <div className="flex flex-col gap-0.5">
@@ -129,18 +129,18 @@ export function ModelPicker({ value, onChange }: ModelPickerProps) {
                     }}
                   >
                     <div className="flex flex-col gap-0.5 min-w-0">
-                      <span
-                        className="text-[11px] font-mono font-medium truncate"
+                       <span
+                         className="text-[11px] font-medium truncate"
                         style={{ color: isSelected ? '#a5b4fc' : '#d6cfc4' }}
                       >
                         {model.name}
                       </span>
                       {model.description && (
-                        <span className="text-[10px] font-mono text-white/25 leading-snug">
+                         <span className="text-[10px] text-white/35 leading-snug">
                           {model.description}
                         </span>
                       )}
-                      <span className="text-[9px] font-mono text-white/18 mt-0.5">
+                       <span className="text-[9px] text-white/28 mt-0.5">
                         {model.contextK}K ctx · {model.id}
                       </span>
                     </div>

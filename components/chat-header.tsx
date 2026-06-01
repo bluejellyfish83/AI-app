@@ -8,9 +8,11 @@ interface ChatHeaderProps {
   title: string
   onRename: (title: string) => void
   onOpenConvSettings: () => void
+  fontSize?: number
+  fontFamily?: 'mono' | 'sans'
 }
 
-export function ChatHeader({ onMenuClick, title, onRename, onOpenConvSettings }: ChatHeaderProps) {
+export function ChatHeader({ onMenuClick, title, onRename, onOpenConvSettings, fontSize = 11, fontFamily = 'mono' }: ChatHeaderProps) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(title)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -68,17 +70,19 @@ export function ChatHeader({ onMenuClick, title, onRename, onOpenConvSettings }:
             onChange={(e) => setDraft(e.target.value)}
             onBlur={commit}
             onKeyDown={handleKeyDown}
-            className="bg-transparent border-b border-white/20 outline-none text-[11px]
-              text-white/80 font-mono text-center w-full max-w-[180px] pb-0.5
-              caret-indigo-400"
+            className={`bg-transparent border-b border-white/20 outline-none
+              text-white/80 text-center w-full max-w-[180px] pb-0.5
+              caret-indigo-400 ${fontFamily === 'sans' ? 'font-sans' : 'font-mono'}`}
+            style={{ fontSize: `${fontSize}px` }}
             aria-label="Rename conversation"
             maxLength={60}
           />
         ) : (
           <button
             onClick={startEdit}
-            className="text-[11px] font-mono text-white/50 hover:text-white/80
-              transition-colors duration-200 truncate max-w-[180px]"
+            className={`text-white/50 hover:text-white/80
+              transition-colors duration-200 truncate max-w-[180px] ${fontFamily === 'sans' ? 'font-sans' : 'font-mono'}`}
+            style={{ fontSize: `${fontSize}px` }}
             aria-label={`Conversation title: ${title}. Tap to rename.`}
             title="Tap to rename"
           >
