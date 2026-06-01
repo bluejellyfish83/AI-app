@@ -14,12 +14,15 @@ A beautiful liquid-glass AI chat interface built with Next.js 16, React 19, Tail
 
 - **Multi-model chat** — 18+ models from Anthropic, OpenAI, Google, Meta, Mistral, DeepSeek, and xAI via OpenRouter
 - **Streaming responses** — real-time typewriter effect via SSE (Server-Sent Events)
+- **Stop streaming** — click the stop button during AI generation to pause/abort the response (partial content is preserved)
 - **Markdown rendering** — AI responses render as full Markdown (code blocks, tables, lists, etc.) with styled theme
 - **Persistent conversations** — all chats and messages stored in Supabase PostgreSQL
+- **Swipe-to-delete** — swipe left on conversations in the sidebar to reveal a delete button with confirmation dialog
 - **Configurable context window** — slider + number input to control how many past messages the model sees (1–500)
 - **Daily memory system** — automatic daily summarization gives the model long-term context
 - **Live model list** — refresh to pull the latest models from OpenRouter's API
 - **Per-conversation settings** — custom system prompt, model, and context size per chat
+- **Universal font settings** — choose between Geist Sans or Geist Mono font family, adjustable size (10–20px), applies across the entire UI
 - **Glassmorphism UI** — frosted glass panels, animated ambient orbs, dark theme
 
 ---
@@ -54,12 +57,12 @@ app/
 components/
   ambient-orbs.tsx                   — animated background blobs
   chat-header.tsx                    — top bar: menu, editable title, settings
-  chat-sidebar.tsx                   — slide-in conversation list
+  chat-sidebar.tsx                   — slide-in conversation list with swipe-to-delete
   chat-messages.tsx                  — scrollable message list, auto-scroll
   message-bubble.tsx                 — UserBubble + AIBubble renderers
-  chat-input-bar.tsx                 — textarea, send button, scroll-to-latest
+  chat-input-bar.tsx                 — textarea, send/stop button, scroll-to-latest
   model-picker.tsx                   — model dropdown grouped by provider
-  settings-sheet.tsx                 — bottom sheet: prompt, model, font
+  settings-sheet.tsx                 — bottom sheet: prompt, model, font, context
   chat-empty-state.tsx               — empty state (ambient orbs show through)
 
 lib/
@@ -159,6 +162,21 @@ Run `supabase/schema.sql` in the Supabase SQL Editor to create these tables.
 5. Calls OpenRouter with streaming via OpenAI SDK
 6. Returns SSE stream → frontend reads chunks and appends to AI message (typewriter effect)
 7. After stream ends, API saves full assistant message to Supabase in background
+8. User can click the **stop button** (square icon) at any time to abort the stream — partial content is preserved
+
+### Conversation Management
+
+- **Create**: Click "New conversation" in the sidebar
+- **Switch**: Click any conversation in the sidebar
+- **Delete**: Swipe left on a conversation to reveal a red delete button → tap it → confirm with "Delete" in the popup
+- **Rename**: Click the conversation title in the header to edit inline
+- **Auto-title**: New chats are automatically titled from the first 32 characters of the first message
+
+### Font & Display Settings
+
+- **Font family**: Choose between Geist Sans (clean sans-serif) or Geist Mono (monospace) — applies everywhere: sidebar, settings, model picker, messages
+- **Font size**: Adjustable from 10px to 20px via slider or number input
+- **Context messages**: Configurable from 1 to 500 messages sent to the model per request
 
 ### Memory System
 
@@ -205,17 +223,7 @@ curl -X POST https://your-domain.vercel.app/api/cron/summarize \
 
 ## Models
 
-18 built-in models across 7 providers. Click the refresh button in the model picker to load the full live list from OpenRouter (500+ models). Cached in localStorage.
-
-| Provider | Models |
-|----------|--------|
-| Anthropic | Claude Opus 4, Sonnet 4.5, Haiku 3.5 |
-| OpenAI | GPT-4.1, GPT-4.1 Mini, o3, o4-mini |
-| Google | Gemini 2.5 Pro, Gemini 2.5 Flash |
-| Meta | Llama 4 Maverick, Llama 4 Scout |
-| Mistral | Mistral Large, Mistral Small 3.2 |
-| DeepSeek | DeepSeek R2, DeepSeek Chat V3 |
-| xAI | Grok 3, Grok 3 Mini |
+Full list from OpenRouter (500+ models). Cached in localStorage.
 
 Default: `anthropic/claude-sonnet-4-5`
 
