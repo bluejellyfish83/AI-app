@@ -41,7 +41,7 @@ A beautiful liquid-glass AI chat interface built with Next.js 16, React 19, Tail
 | Icons | lucide-react |
 | Database | Supabase (PostgreSQL) |
 | AI Gateway | OpenRouter (OpenAI-compatible API) |
-| Edge Runtime | Vercel Edge Functions |
+| Package Manager | pnpm |
 
 ---
 
@@ -53,9 +53,9 @@ app/
   layout.tsx                         — fonts, metadata, html shell
   globals.css                        — Tailwind theme + custom glass classes
   api/
-    chat/route.ts                    — Edge: SSE streaming chat endpoint
-    models/route.ts                  — Edge: proxy OpenRouter /models (1hr cache)
-    cron/summarize/route.ts          — Node.js: daily conversation summarization
+    chat/route.ts                    — SSE streaming chat endpoint (Node.js runtime)
+    models/route.ts                  — proxy OpenRouter /models (1hr cache, Edge)
+    cron/summarize/route.ts          — daily conversation summarization (Node.js runtime)
 
 components/
   ambient-orbs.tsx                   — animated background blobs
@@ -86,7 +86,7 @@ supabase/
 ```bash
 git clone <your-repo-url>
 cd aiApp-project
-npm install
+pnpm install
 ```
 
 ### 2. Set up Supabase
@@ -121,7 +121,7 @@ CRON_SECRET=your-random-secret-here
 ### 4. Run
 
 ```bash
-npm run dev
+pnpm dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
@@ -161,13 +161,15 @@ Run `supabase/schema.sql` in the Supabase SQL Editor to create these tables.
 ### Chat Flow
 
 1. User types a message → optimistic UI update (message appears immediately)
-2. `fetch('/api/chat', { chatId, content })` → Edge API route
-3. API saves user message to Supabase, fetches last 8 messages + daily summaries
-4. Builds system prompt with user's custom prompt + current date/time + historical memory
+2. `fetch('/api/chat', { chatId, content })` → API route
+3. API fetches last N messages from Supabase (based on `context_size` setting), THEN saves the new user message
+4. Builds system prompt with user's custom prompt + current date/time + daily summaries (if any)
 5. Calls OpenRouter with streaming via OpenAI SDK
 6. Returns SSE stream → frontend reads chunks and appends to AI message (typewriter effect)
-7. After stream ends, API saves full assistant message to Supabase in background
+7. After stream ends, API awaits saving the full assistant message to Supabase before closing
 8. User can click the **stop button** (square icon) at any time to abort the stream — partial content is preserved
+
+> **Important**: The user message is saved AFTER fetching context to avoid sending it twice to the LLM. The assistant message save is `await`ed before the stream closes to ensure persistence on Vercel's serverless runtime.
 
 ### Conversation Management
 
@@ -277,4 +279,4 @@ This project deploys on [Vercel](https://vercel.com):
 3. Add environment variables in Vercel project settings
 4. Deploy
 
-The API routes use Edge Runtime (`app/api/chat`, `app/api/models`) for low latency, and Node.js runtime (`app/api/cron/summarize`) for the cron job.
+`app/api/chat` and `app/api/cron/summarize` use **Node.js runtime** (needed for reliable async DB writes after streaming). `app/api/models` uses **Edge Runtime** for low-latency model list proxying.
