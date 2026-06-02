@@ -57,7 +57,9 @@ export function DateSeparator({ label }: { label: string }) {
 export function UserBubble({ message, onCopy, onDelete, onBranch }: MessageBubbleProps) {
   const [copied, setCopied] = useState(false)
   const [pending, setPending] = useState<'delete' | 'branch' | null>(null)
+  const [tapped, setTapped] = useState(false)
   const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const bubbleRef = useRef<HTMLDivElement>(null)
 
   // Auto-reset pending state after 3 seconds
   useEffect(() => {
@@ -66,6 +68,27 @@ export function UserBubble({ message, onCopy, onDelete, onBranch }: MessageBubbl
       return () => { if (resetTimerRef.current) clearTimeout(resetTimerRef.current) }
     }
   }, [pending])
+
+  // Close tapped state when clicking outside
+  useEffect(() => {
+    if (!tapped) return
+    const handleOutside = (e: MouseEvent | TouchEvent) => {
+      if (bubbleRef.current && !bubbleRef.current.contains(e.target as Node)) {
+        setTapped(false)
+      }
+    }
+    document.addEventListener('mousedown', handleOutside)
+    document.addEventListener('touchstart', handleOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleOutside)
+      document.removeEventListener('touchstart', handleOutside)
+    }
+  }, [tapped])
+
+  const handleBubbleTap = (e: React.MouseEvent | React.TouchEvent) => {
+    if ((e.target as HTMLElement).closest('button')) return
+    setTapped((prev) => !prev)
+  }
 
   const handleCopy = () => {
     navigator.clipboard.writeText(message.content)
@@ -93,7 +116,11 @@ export function UserBubble({ message, onCopy, onDelete, onBranch }: MessageBubbl
   }
 
   return (
-    <div className="group w-full flex flex-col items-end gap-0.5">
+    <div
+      ref={bubbleRef}
+      className="group w-full flex flex-col items-end gap-0.5"
+      onClick={handleBubbleTap}
+    >
       <div className="w-full flex justify-end">
         <div
           className="bubble-user px-3 py-1.5 rounded-[18px] rounded-br-sm
@@ -104,8 +131,10 @@ export function UserBubble({ message, onCopy, onDelete, onBranch }: MessageBubbl
         </div>
       </div>
       <div className="flex items-center gap-1 pr-0.5">
-        <div className="flex items-center gap-0.5
-          opacity-0 group-hover:opacity-100 transition-opacity duration-150"
+        <div
+          className="flex items-center gap-0.5
+            opacity-0 group-hover:opacity-100 data-[tapped=true]:opacity-100 transition-opacity duration-150"
+          data-tapped={tapped ? 'true' : undefined}
           style={{ marginTop: '1px' }}
         >
           <button
@@ -154,7 +183,9 @@ export function UserBubble({ message, onCopy, onDelete, onBranch }: MessageBubbl
 export function AIBubble({ message, onCopy, onDelete, onBranch }: MessageBubbleProps) {
   const [copied, setCopied] = useState(false)
   const [pending, setPending] = useState<'delete' | 'branch' | null>(null)
+  const [tapped, setTapped] = useState(false)
   const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const bubbleRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (pending) {
@@ -162,6 +193,27 @@ export function AIBubble({ message, onCopy, onDelete, onBranch }: MessageBubbleP
       return () => { if (resetTimerRef.current) clearTimeout(resetTimerRef.current) }
     }
   }, [pending])
+
+  // Close tapped state when clicking outside
+  useEffect(() => {
+    if (!tapped) return
+    const handleOutside = (e: MouseEvent | TouchEvent) => {
+      if (bubbleRef.current && !bubbleRef.current.contains(e.target as Node)) {
+        setTapped(false)
+      }
+    }
+    document.addEventListener('mousedown', handleOutside)
+    document.addEventListener('touchstart', handleOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleOutside)
+      document.removeEventListener('touchstart', handleOutside)
+    }
+  }, [tapped])
+
+  const handleBubbleTap = (e: React.MouseEvent | React.TouchEvent) => {
+    if ((e.target as HTMLElement).closest('button')) return
+    setTapped((prev) => !prev)
+  }
 
   const handleCopy = () => {
     navigator.clipboard.writeText(message.content)
@@ -189,7 +241,11 @@ export function AIBubble({ message, onCopy, onDelete, onBranch }: MessageBubbleP
   }
 
   return (
-    <div className="group w-full text-left py-1">
+    <div
+      ref={bubbleRef}
+      className="group w-full text-left py-1"
+      onClick={handleBubbleTap}
+    >
       <div
         className="markdown-body"
         style={{ fontSize: 'var(--chat-font-size, 11px)' }}
@@ -198,8 +254,11 @@ export function AIBubble({ message, onCopy, onDelete, onBranch }: MessageBubbleP
           {message.content}
         </ReactMarkdown>
       </div>
-      <div className="flex items-center gap-0.5 mt-0.5
-        opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+      <div
+        className="flex items-center gap-0.5 mt-0.5
+          opacity-0 group-hover:opacity-100 data-[tapped=true]:opacity-100 transition-opacity duration-150"
+        data-tapped={tapped ? 'true' : undefined}
+      >
         <button
           onClick={handleCopy}
           className="w-5 h-5 rounded flex items-center justify-center

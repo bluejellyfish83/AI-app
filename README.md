@@ -121,7 +121,7 @@ CRON_SECRET=your-random-secret-here
 ### 4. Run
 
 ```bash
-pnpm dev
+npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000).

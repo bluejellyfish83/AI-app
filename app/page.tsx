@@ -47,14 +47,41 @@ function dbRoleToUI(role: string): 'user' | 'ai' {
   return role === 'assistant' ? 'ai' : 'user'
 }
 
+const GLOBAL_DEFAULTS_KEY = 'liquid_global_defaults'
+
+function loadGlobalDefaults(): GlobalDefaults {
+  if (typeof window === 'undefined') {
+    return { systemPrompt: '', modelId: DEFAULT_MODEL_ID, contextSize: 8, fontFamily: 'mono', fontSize: 11 }
+  }
+  try {
+    const raw = localStorage.getItem(GLOBAL_DEFAULTS_KEY)
+    if (raw) {
+      const saved = JSON.parse(raw)
+      return {
+        systemPrompt: saved.systemPrompt ?? '',
+        modelId: saved.modelId ?? DEFAULT_MODEL_ID,
+        contextSize: saved.contextSize ?? 8,
+        fontFamily: saved.fontFamily ?? 'mono',
+        fontSize: saved.fontSize ?? 11,
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+  return { systemPrompt: '', modelId: DEFAULT_MODEL_ID, contextSize: 8, fontFamily: 'mono', fontSize: 11 }
+}
+
 export default function ChatPage() {
-  const [globalDefaults, setGlobalDefaults] = useState<GlobalDefaults>({
-    systemPrompt: '',
-    modelId: DEFAULT_MODEL_ID,
-    contextSize: 8,
-    fontFamily: 'mono',
-    fontSize: 11,
-  })
+  const [globalDefaults, setGlobalDefaults] = useState<GlobalDefaults>(loadGlobalDefaults)
+
+  // Persist global defaults to localStorage on every change
+  useEffect(() => {
+    try {
+      localStorage.setItem(GLOBAL_DEFAULTS_KEY, JSON.stringify(globalDefaults))
+    } catch {
+      /* ignore quota errors */
+    }
+  }, [globalDefaults])
 
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [activeId, setActiveId] = useState<string>('')
