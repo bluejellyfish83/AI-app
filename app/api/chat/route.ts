@@ -1,5 +1,3 @@
-export const runtime = 'edge'
-
 import OpenAI from 'openai'
 import { createServiceClient } from '@/lib/supabase'
 
@@ -24,14 +22,7 @@ export async function POST(req: Request) {
 
     const supabase = createServiceClient()
 
-    // a. Save user message
-    await supabase.from('messages').insert({
-      chat_id: chatId,
-      role: 'user',
-      content,
-    })
-
-    // b. Fetch chat config
+    // a. Fetch chat config
     const { data: chat, error: chatError } = await supabase
       .from('chats')
       .select('model_id, system_prompt, context_size')
@@ -45,7 +36,7 @@ export async function POST(req: Request) {
       })
     }
 
-    // c. Fetch last N messages (desc), then reverse to chronological
+    // b. Fetch last N messages BEFORE inserting the new one (avoids duplicate)
     const contextSize = chat.context_size ?? 8
     const { data: recentMessages } = await supabase
       .from('messages')
@@ -54,7 +45,14 @@ export async function POST(req: Request) {
       .order('created_at', { ascending: false })
       .limit(contextSize)
 
-    const last8 = (recentMessages ?? []).reverse()
+    const lastN = (recentMessages ?? []).reverse()
+
+    // c. Save user message AFTER fetching context
+    await supabase.from('messages').insert({
+      chat_id: chatId,
+      role: 'user',
+      content,
+    })
 
     // d. Fetch daily summaries
     const { data: summaries } = await supabase
@@ -88,7 +86,7 @@ export async function POST(req: Request) {
 
     const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
       { role: 'system', content: systemContent },
-      ...last8.map((m) => ({
+      ...lastN.map((m) => ({
         role: m.role as 'user' | 'assistant',
         content: m.content,
       })),
@@ -114,41 +112,32 @@ export async function POST(req: Request) {
             const text = chunk.choices[0]?.delta?.content ?? ''
             if (text) {
               assistantContent += text
-              // JSON-encode to preserve newlines in SSE payload
               controller.enqueue(encoder.encode(`data: ${JSON.stringify(text)}\n\n`))
             }
           }
           controller.enqueue(encoder.encode('data: [DONE]\n\n'))
-          controller.close()
-        } catch (err) {
-          console.error('Stream error:', err)
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify('[Error: streaming failed]')}\n\n`))
-          controller.enqueue(encoder.encode('data: [DONE]\n\n'))
-          controller.close()
-        }
 
-        // h. Save assistant message in background (non-blocking)
-        if (assistantContent) {
-          supabase
-            .from('messages')
-            .insert({
+          // h. Save assistant message BEFORE closing the stream (critical for Node.js runtime)
+          if (assistantContent) {
+            const { error: saveError } = await supabase.from('messages').insert({
               chat_id: chatId,
               role: 'assistant',
               content: assistantContent,
             })
-            .then(({ error }) => {
-              if (error) console.error('Failed to save assistant message:', error)
-            })
+            if (saveError) console.error('Failed to save assistant message:', saveError)
 
-          // Update chat updated_at
-          supabase
-            .from('chats')
-            .update({ updated_at: new Date().toISOString() })
-            .eq('id', chatId)
-            .then(({ error }) => {
-              if (error) console.error('Failed to update chat updated_at:', error)
-            })
+            // Update chat updated_at
+            await supabase
+              .from('chats')
+              .update({ updated_at: new Date().toISOString() })
+              .eq('id', chatId)
+          }
+        } catch (err) {
+          console.error('Stream error:', err)
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify('[Error: streaming failed]')}\n\n`))
+          controller.enqueue(encoder.encode('data: [DONE]\n\n'))
         }
+        controller.close()
       },
     })
 
