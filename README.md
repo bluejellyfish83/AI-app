@@ -18,6 +18,9 @@ A beautiful liquid-glass AI chat interface built with Next.js 16, React 19, Tail
 - **Markdown rendering** — AI responses render as full Markdown (code blocks, tables, lists, etc.) with styled theme
 - **Persistent conversations** — all chats and messages stored in Supabase PostgreSQL
 - **Swipe-to-delete** — swipe left on conversations in the sidebar to reveal a delete button with confirmation dialog
+- **Message actions** — hover over any message to reveal Copy, Branch, and Delete buttons (double-press safety for destructive actions)
+- **Branching** — fork any point in a conversation into a new "Branch: <title>" chat with full message history
+- **Undo branch** — undo icon in header lets you return to (or delete) a branched conversation
 - **Configurable context window** — slider + number input to control how many past messages the model sees (1–500)
 - **Daily memory system** — automatic daily summarization gives the model long-term context
 - **Live model list** — refresh to pull the latest models from OpenRouter's API
@@ -142,10 +145,12 @@ Open [http://localhost:3000](http://localhost:3000).
 Three tables, all with RLS disabled (auth is client-side via localStorage `user_id`):
 
 ```
-chats              — id, user_id, title, model_id, context_size, system_prompt, created_at, updated_at
+chats              — id, user_id, title, model_id, context_size, system_prompt, branched_from, created_at, updated_at
 messages           — id, chat_id (FK), role, content, created_at
 daily_summaries    — id, chat_id (FK), summary_date, summary, created_at
 ```
+
+> For existing databases, run: `ALTER TABLE chats ADD COLUMN branched_from UUID REFERENCES chats(id) ON DELETE SET NULL;`
 
 Run `supabase/schema.sql` in the Supabase SQL Editor to create these tables.
 
@@ -171,6 +176,14 @@ Run `supabase/schema.sql` in the Supabase SQL Editor to create these tables.
 - **Delete**: Swipe left on a conversation to reveal a red delete button → tap it → confirm with "Delete" in the popup
 - **Rename**: Click the conversation title in the header to edit inline
 - **Auto-title**: New chats are automatically titled from the first 32 characters of the first message
+- **Branch**: Hover any message → click the git-branch icon (double-click to confirm) → creates a new chat prefixed with "Branch: "
+- **Undo branch**: Branched conversations show an undo icon in the header → click to return to (or delete) the branch
+
+### Message Actions
+
+- **Copy**: Hover any message → click the copy icon to copy content to clipboard
+- **Delete**: Hover → click trash icon → icon turns red → click again to confirm (auto-resets after 3s)
+- **Branch**: Hover → click branch icon → icon turns purple → click again to confirm
 
 ### Font & Display Settings
 
@@ -249,6 +262,7 @@ interface Conversation {
   systemPrompt: string
   modelId: string          // OpenRouter model ID
   contextSize: number      // number of recent messages sent to model (1–500, default 8)
+  branchedFromId?: string  // ID of the original conversation if this is a branch
 }
 ```
 
