@@ -5,6 +5,7 @@ create table chats (
   model_id text default 'openai/gpt-4o-mini',
   context_size integer default 8,
   system_prompt text default '',
+  branched_from uuid references chats(id) on delete set null,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
@@ -25,6 +26,9 @@ create table daily_summaries (
   created_at timestamptz default now(),
   unique(chat_id, summary_date)
 );
+
+-- If adding branched_from to an existing database, run:
+-- ALTER TABLE chats ADD COLUMN branched_from UUID REFERENCES chats(id) ON DELETE SET NULL;
 
 alter table chats disable row level security;
 alter table messages disable row level security;

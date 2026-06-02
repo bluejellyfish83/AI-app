@@ -8,6 +8,8 @@ interface ChatMessagesProps {
   messages: Message[]
   isLoading?: boolean
   onSuggestionClick?: (text: string) => void
+  onDeleteMessage?: (messageId: string) => void
+  onBranchMessage?: (messageIndex: number) => void
 }
 
 export interface ChatMessagesHandle {
@@ -67,7 +69,7 @@ function scrollToLastUserBubble(
 }
 
 export const ChatMessages = forwardRef<ChatMessagesHandle, ChatMessagesProps>(
-  function ChatMessages({ messages, isLoading = false, onSuggestionClick }, ref) {
+  function ChatMessages({ messages, isLoading = false, onSuggestionClick, onDeleteMessage, onBranchMessage }, ref) {
     const scrollRef = useRef<HTMLDivElement>(null)
     const bubbleRefs = useRef<Map<string, HTMLDivElement>>(new Map())
     // Track previous message count to detect new arrivals
@@ -158,7 +160,11 @@ export const ChatMessages = forwardRef<ChatMessagesHandle, ChatMessagesProps>(
                 }}
               >
                 {showDate && <DateSeparator label={formatDateLabel(message.timestamp)} />}
-                <MessageBubble message={message} />
+                <MessageBubble
+                  message={message}
+                  onDelete={onDeleteMessage ? () => onDeleteMessage(message.id) : undefined}
+                  onBranch={onBranchMessage ? () => onBranchMessage(i) : undefined}
+                />
               </div>
             )
           })}

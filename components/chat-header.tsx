@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { Menu, MoreHorizontal } from 'lucide-react'
+import { Menu, MoreHorizontal, Undo2, X } from 'lucide-react'
 
 interface ChatHeaderProps {
   onMenuClick: () => void
@@ -10,11 +10,14 @@ interface ChatHeaderProps {
   onOpenConvSettings: () => void
   fontSize?: number
   fontFamily?: 'mono' | 'sans'
+  isBranched?: boolean
+  onGoBackBranch?: (deleteBranch: boolean) => void
 }
 
-export function ChatHeader({ onMenuClick, title, onRename, onOpenConvSettings, fontSize = 11, fontFamily = 'mono' }: ChatHeaderProps) {
+export function ChatHeader({ onMenuClick, title, onRename, onOpenConvSettings, fontSize = 11, fontFamily = 'mono', isBranched, onGoBackBranch }: ChatHeaderProps) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(title)
+  const [showBranchConfirm, setShowBranchConfirm] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
   // Keep draft in sync when external title changes (e.g. auto-title from first message)
@@ -61,8 +64,53 @@ export function ChatHeader({ onMenuClick, title, onRename, onOpenConvSettings, f
         <Menu style={{ width: '16px', height: '16px' }} />
       </button>
 
-      {/* Editable conversation title */}
-      <div className="flex-1 flex justify-center px-2 min-w-0">
+      {/* Undo branch button + editable title */}
+      <div className="flex-1 flex items-center justify-center px-2 min-w-0 gap-1">
+        {isBranched && onGoBackBranch && (
+          <div className="relative shrink-0">
+            <button
+              onClick={() => setShowBranchConfirm(!showBranchConfirm)}
+              className="w-6 h-6 rounded-lg flex items-center justify-center
+                hover:bg-white/[0.08] transition-all duration-200"
+              style={{ color: '#d6cfc4', opacity: 0.5 }}
+              aria-label="Go back to original conversation"
+            >
+              <Undo2 className="w-3.5 h-3.5" />
+            </button>
+            {showBranchConfirm && (
+              <div
+                className="absolute top-full left-1/2 -translate-x-1/2 mt-2 z-50
+                  flex flex-col gap-2 p-3 rounded-xl whitespace-nowrap"
+                style={{
+                  background: 'rgba(8,8,18,0.95)',
+                  backdropFilter: 'blur(24px)',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  minWidth: '200px',
+                }}
+              >
+                <p className="text-[11px] text-white/60 text-center">Return to original conversation?</p>
+                <div className="flex gap-2 justify-center">
+                  <button
+                    onClick={() => { setShowBranchConfirm(false); onGoBackBranch(false) }}
+                    className="px-3 py-1 rounded-lg text-[11px] text-white/60
+                      transition-colors duration-150 hover:text-white/80"
+                    style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.1)' }}
+                  >
+                    Keep branch
+                  </button>
+                  <button
+                    onClick={() => { setShowBranchConfirm(false); onGoBackBranch(true) }}
+                    className="px-3 py-1 rounded-lg text-[11px] text-white
+                      transition-colors duration-150"
+                    style={{ background: 'rgba(220,38,38,0.85)' }}
+                  >
+                    Delete & return
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
         {editing ? (
           <input
             ref={inputRef}

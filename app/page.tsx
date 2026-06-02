@@ -19,6 +19,7 @@ export interface Conversation {
   systemPrompt: string
   modelId: string
   contextSize: number
+  branchedFromId?: string
 }
 
 export interface GlobalDefaults {
@@ -78,7 +79,7 @@ export default function ChatPage() {
     async function load() {
       const { data: chats, error } = await supabase
         .from('chats')
-        .select('id, title, model_id, context_size, system_prompt, updated_at, created_at')
+        .select('id, title, model_id, context_size, system_prompt, branched_from, updated_at, created_at')
         .eq('user_id', userId)
         .order('updated_at', { ascending: false })
 
@@ -154,6 +155,7 @@ export default function ChatPage() {
         systemPrompt: c.system_prompt ?? '',
         modelId: c.model_id ?? DEFAULT_MODEL_ID,
         contextSize: c.context_size ?? 8,
+        branchedFromId: c.branched_from ?? undefined,
       }))
 
       setConversations(convs)
@@ -308,6 +310,11 @@ export default function ChatPage() {
 
       // Clean up loaded chats cache
       loadedChatsRef.current.delete(id)
+
+      // Clear branchedFromId on any branches that pointed to the deleted chat
+      setConversations((prev) =>
+        prev.map((c) => (c.branchedFromId === id ? { ...c, branchedFromId: undefined } : c)),
+      )
     },
     [activeId, supabase, handleNewConversation],
   )
@@ -319,6 +326,91 @@ export default function ChatPage() {
     }
     setIsLoading(false)
   }, [])
+
+  const handleDeleteMessage = useCallback(
+    async (messageId: string) => {
+      if (!active) return
+      // Remove from local state
+      updateActive((c) => ({
+        ...c,
+        messages: c.messages.filter((m) => m.id !== messageId),
+      }))
+      // Remove from Supabase
+      await supabase.from('messages').delete().eq('id', messageId)
+    },
+    [active, updateActive, supabase],
+  )
+
+  const handleBranchMessage = useCallback(
+    async (messageIndex: number) => {
+      if (!active) return
+      const userId = getUserId()
+      const branchMessages = active.messages.slice(0, messageIndex + 1)
+
+      // Create new chat in Supabase
+      const { data: newChat, error } = await supabase
+        .from('chats')
+        .insert({
+          user_id: userId,
+          title: 'Branch: ' + active.title,
+          model_id: active.modelId,
+          context_size: active.contextSize,
+          system_prompt: active.systemPrompt,
+        })
+        .select('id, title, model_id, context_size, system_prompt, branched_from, updated_at, created_at')
+        .single()
+
+      if (error || !newChat) {
+        console.error('Failed to create branch:', error)
+        return
+      }
+
+      // Store the branched_from reference
+      await supabase.from('chats').update({ branched_from: active.id }).eq('id', newChat.id)
+
+      // Insert branch messages into Supabase
+      if (branchMessages.length > 0) {
+        const rows = branchMessages.map((m) => ({
+          chat_id: newChat.id,
+          role: m.role === 'ai' ? 'assistant' : 'user',
+          content: m.content,
+        }))
+        await supabase.from('messages').insert(rows)
+      }
+
+      // Add to local state
+      const conv: Conversation = {
+        id: newChat.id,
+        title: newChat.title ?? 'Branch',
+        messages: branchMessages.map((m) => ({ ...m, id: crypto.randomUUID() })),
+        updatedAt: new Date(newChat.updated_at),
+        systemPrompt: newChat.system_prompt ?? '',
+        modelId: newChat.model_id ?? DEFAULT_MODEL_ID,
+        contextSize: newChat.context_size ?? 8,
+        branchedFromId: active.id,
+      }
+
+      setConversations((prev) => [conv, ...prev])
+      setActiveId(conv.id)
+      setInput('')
+      setSidebarOpen(false)
+    },
+    [active, supabase],
+  )
+
+  const handleGoBackBranch = useCallback(
+    async (deleteBranch: boolean) => {
+      if (!active?.branchedFromId) return
+      const originalId = active.branchedFromId
+      if (deleteBranch) {
+        await supabase.from('chats').delete().eq('id', active.id)
+        setConversations((prev) => prev.filter((c) => c.id !== active.id))
+        loadedChatsRef.current.delete(active.id)
+      }
+      setActiveId(originalId)
+    },
+    [active, supabase],
+  )
 
   const sendMessage = useCallback(async () => {
     const text = input.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim()
@@ -506,6 +598,8 @@ export default function ChatPage() {
         onOpenConvSettings={() => setConvSettingsOpen(true)}
         fontSize={globalDefaults.fontSize}
         fontFamily={globalDefaults.fontFamily}
+        isBranched={!!active.branchedFromId && conversations.some(c => c.id === active.branchedFromId)}
+        onGoBackBranch={handleGoBackBranch}
       />
 
       <main
@@ -523,6 +617,8 @@ export default function ChatPage() {
           onSuggestionClick={(text) => {
             setInput(text)
           }}
+          onDeleteMessage={handleDeleteMessage}
+          onBranchMessage={handleBranchMessage}
         />
       </main>
 
