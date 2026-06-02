@@ -3,12 +3,12 @@ export const runtime = 'nodejs'
 import OpenAI from 'openai'
 import { createServiceClient } from '@/lib/supabase'
 
-const openrouter = new OpenAI({
-  baseURL: 'https://openrouter.ai/api/v1',
-  apiKey: process.env.OPENROUTER_API_KEY,
-})
-
 export async function POST(req: Request) {
+  const openrouter = new OpenAI({
+    baseURL: 'https://openrouter.ai/api/v1',
+    apiKey: process.env.OPENROUTER_API_KEY,
+  })
+
   // Verify cron secret
   const authHeader = req.headers.get('authorization')
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {

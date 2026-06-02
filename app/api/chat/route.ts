@@ -3,13 +3,13 @@ export const runtime = 'edge'
 import OpenAI from 'openai'
 import { createServiceClient } from '@/lib/supabase'
 
-const openrouter = new OpenAI({
-  baseURL: 'https://openrouter.ai/api/v1',
-  apiKey: process.env.OPENROUTER_API_KEY,
-})
-
 export async function POST(req: Request) {
   try {
+    const openrouter = new OpenAI({
+      baseURL: 'https://openrouter.ai/api/v1',
+      apiKey: process.env.OPENROUTER_API_KEY,
+    })
+
     const { chatId, content } = (await req.json()) as {
       chatId: string
       content: string
