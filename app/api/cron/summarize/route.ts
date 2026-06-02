@@ -24,7 +24,7 @@ export async function POST(req: Request) {
 
     const supabase = createServiceClient()
 
-    // a. Save user message
+    // 1. Save user message (blocking — must complete before we build context)
     const { error: userMsgError } = await supabase.from('messages').insert({
       chat_id: chatId,
       role: 'user',
@@ -39,7 +39,7 @@ export async function POST(req: Request) {
       })
     }
 
-    // b. Fetch chat config
+    // 2. Fetch chat config
     const { data: chat, error: chatError } = await supabase
       .from('chats')
       .select('model_id, system_prompt, context_size')
@@ -53,7 +53,7 @@ export async function POST(req: Request) {
       })
     }
 
-    // c. Fetch last N messages (desc), then reverse to chronological
+    // 3. Fetch recent messages (includes the user message we just saved)
     const contextSize = chat.context_size ?? 8
     const { data: recentMessages, error: recentError } = await supabase
       .from('messages')
@@ -62,20 +62,18 @@ export async function POST(req: Request) {
       .order('created_at', { ascending: false })
       .limit(contextSize)
 
-    if (recentError) {
-      console.error('Failed to fetch recent messages:', recentError)
-    }
+    if (recentError) console.error('Failed to fetch recent messages:', recentError)
 
     const last8 = (recentMessages ?? []).reverse()
 
-    // d. Fetch daily summaries
+    // 4. Fetch summaries
     const { data: summaries } = await supabase
       .from('daily_summaries')
       .select('summary_date, summary')
       .eq('chat_id', chatId)
       .order('summary_date', { ascending: false })
 
-    // e. Build system prompt with time + historical memory
+    // 5. Build system prompt
     const now = new Date()
     const dateStr = now.toLocaleString('en-US', {
       weekday: 'long',
@@ -98,9 +96,9 @@ export async function POST(req: Request) {
       systemContent += `\n\nHistorical context by date:\n${summaryBlock}`
     }
 
-    // f. Build messages array for the LLM
-    // NOTE: last8 already includes the user message we just saved.
-    // Do NOT append the user message again.
+    // 6. Build messages array for the LLM
+    // NOTE: last8 already contains the user message saved in step 1.
+    // Do NOT append { role: 'user', content } again.
     const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
       { role: 'system', content: systemContent },
       ...last8.map((m) => ({
@@ -109,7 +107,7 @@ export async function POST(req: Request) {
       })),
     ]
 
-    // g. Call OpenRouter via OpenAI SDK, streaming
+    // 7. Start LLM stream
     const stream = await openrouter.chat.completions.create({
       model: chat.model_id,
       messages,
@@ -117,7 +115,6 @@ export async function POST(req: Request) {
       stream: true,
     })
 
-    // h. Return SSE ReadableStream
     const encoder = new TextEncoder()
 
     const readable = new ReadableStream({
@@ -137,13 +134,12 @@ export async function POST(req: Request) {
           console.error('Stream error:', err)
           controller.enqueue(encoder.encode(`data: ${JSON.stringify('[Error: streaming failed]')}\n\n`))
           controller.enqueue(encoder.encode('data: [DONE]\n\n'))
-        } finally {
-          // Close the stream to the client first
-          controller.close()
         }
 
-        // i. Persist assistant message AFTER the stream is closed.
-        // We await this so the Edge runtime stays alive until the write completes.
+        // ───────────────────────────────────────────
+        // CRITICAL: Await DB write BEFORE closing the stream.
+        // On Vercel Edge, after controller.close() the isolate dies.
+        // ───────────────────────────────────────────
         if (assistantContent) {
           try {
             const { error: msgError } = await supabase
@@ -164,6 +160,8 @@ export async function POST(req: Request) {
             console.error('Error during assistant save:', saveErr)
           }
         }
+
+        controller.close()
       },
     })
 
