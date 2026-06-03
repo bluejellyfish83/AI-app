@@ -7,6 +7,7 @@ import { ChatEmptyState } from './chat-empty-state'
 interface ChatMessagesProps {
   messages: Message[]
   isLoading?: boolean
+  isMessagesLoading?: boolean
   onSuggestionClick?: (text: string) => void
   onDeleteMessage?: (messageId: string) => void
   onBranchMessage?: (messageIndex: number) => void
@@ -70,7 +71,7 @@ function scrollToLastUserBubble(
 }
 
 export const ChatMessages = forwardRef<ChatMessagesHandle, ChatMessagesProps>(
-  function ChatMessages({ messages, isLoading = false, onSuggestionClick, onDeleteMessage, onBranchMessage, onRetryMessage }, ref) {
+  function ChatMessages({ messages, isLoading = false, isMessagesLoading = false, onSuggestionClick, onDeleteMessage, onBranchMessage, onRetryMessage }, ref) {
     const scrollRef = useRef<HTMLDivElement>(null)
     const bubbleRefs = useRef<Map<string, HTMLDivElement>>(new Map())
     // Track previous message count to detect new arrivals
@@ -126,7 +127,7 @@ export const ChatMessages = forwardRef<ChatMessagesHandle, ChatMessagesProps>(
       }
     }, [messages])
 
-    if (messages.length === 0 && !isLoading) {
+    if (messages.length === 0 && !isLoading && !isMessagesLoading) {
       return (
         <div
           ref={scrollRef}
@@ -136,6 +137,31 @@ export const ChatMessages = forwardRef<ChatMessagesHandle, ChatMessagesProps>(
           aria-live="polite"
         >
           <ChatEmptyState onSuggestionClick={onSuggestionClick ?? (() => {})} />
+        </div>
+      )
+    }
+
+    // Show loading dots while messages are being fetched from Supabase
+    if (messages.length === 0 && isMessagesLoading) {
+      return (
+        <div
+          ref={scrollRef}
+          className="flex-1 overflow-y-auto"
+          role="log"
+          aria-label="Chat messages"
+          aria-live="polite"
+        >
+          <div className="flex-1 flex items-center justify-center h-full">
+            <div className="flex gap-1.5 items-center h-4">
+              {[0, 1, 2].map((i) => (
+                <span
+                  key={i}
+                  className="w-1.5 h-1.5 rounded-full bg-white/30 animate-bounce"
+                  style={{ animationDelay: `${i * 120}ms`, animationDuration: '0.9s' }}
+                />
+              ))}
+            </div>
+          </div>
         </div>
       )
     }

@@ -11,6 +11,7 @@ import type { Message } from '@/components/message-bubble'
 import { DEFAULT_MODEL_ID } from '@/lib/openrouter-models'
 import { createBrowserClient } from '@/lib/supabase'
 import { LoginForm } from '@/components/login-form'
+import { exportToMarkdown, parseMarkdown } from '@/lib/markdown-export'
 
 export interface Conversation {
   id: string
@@ -94,15 +95,19 @@ export default function ChatPage() {
   const [isLoaded, setIsLoaded] = useState(false)
   const [session, setSession] = useState<unknown>(null)
   const [authChecked, setAuthChecked] = useState(false)
+  const [loadingMessages, setLoadingMessages] = useState<Set<string>>(new Set())
 
   const messagesRef = useRef<ChatMessagesHandle>(null)
   const abortRef = useRef<AbortController | null>(null)
-  const supabase = useRef(createBrowserClient()).current
+  const supabase = createBrowserClient()
   const userIdRef = useRef<string>('')
 
   const active = conversations.find((c) => c.id === activeId) ?? conversations[0]
 
   // ── Auth check on mount ──────────────────────────────────────────
+  // getSession() reads from localStorage internally (Supabase caches the
+  // session there), so this is fast and doesn't require a network call
+  // if the session is still valid.
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session: s } }) => {
       setSession(s)
@@ -113,7 +118,7 @@ export default function ChatPage() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
       setSession(s)
       if (s?.user) userIdRef.current = s.user.id
-      setAuthChecked(!s) // re-trigger load if signed out
+      setAuthChecked(true)
     })
 
     return () => subscription.unsubscribe()
@@ -244,6 +249,9 @@ export default function ChatPage() {
 
     loadedChatsRef.current.add(activeId)
 
+    // Show loading dots while fetching messages
+    setLoadingMessages((prev) => new Set(prev).add(activeId))
+
     async function loadMessages() {
       const { data: msgs } = await supabase
         .from('messages')
@@ -268,6 +276,13 @@ export default function ChatPage() {
           ),
         )
       }
+
+      // Done loading
+      setLoadingMessages((prev) => {
+        const next = new Set(prev)
+        next.delete(activeId)
+        return next
+      })
     }
 
     loadMessages()
@@ -336,10 +351,7 @@ export default function ChatPage() {
 
   const handleDeleteConversation = useCallback(
     async (id: string) => {
-      // Delete from Supabase (messages cascade)
-      await supabase.from('chats').delete().eq('id', id)
-
-      // Remove from local state
+      // Optimistic: update local state immediately
       setConversations((prev) => {
         const remaining = prev.filter((c) => c.id !== id)
 
@@ -363,6 +375,9 @@ export default function ChatPage() {
       setConversations((prev) =>
         prev.map((c) => (c.branchedFromId === id ? { ...c, branchedFromId: undefined } : c)),
       )
+
+      // Delete from Supabase in background (fire-and-forget)
+      supabase.from('chats').delete().eq('id', id).then(() => {})
     },
     [activeId, supabase, handleNewConversation],
   )
@@ -631,6 +646,73 @@ export default function ChatPage() {
     await streamAIResponse(active.id, lastUserMsg.content)
   }, [active, isLoading, updateActive, supabase, streamAIResponse])
 
+  const handleExport = useCallback(() => {
+    if (!active) return
+    const md = exportToMarkdown(active.title, active.messages)
+    const blob = new Blob([md], { type: 'text/markdown' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${active.title}.md`
+    a.click()
+    URL.revokeObjectURL(url)
+  }, [active])
+
+  const handleImport = useCallback(async (text: string) => {
+    const userId = userIdRef.current
+    if (!userId) return
+    const parsed = parseMarkdown(text)
+    if (parsed.messages.length === 0) return
+
+    // Create new chat in Supabase
+    const { data: newChat, error } = await supabase
+      .from('chats')
+      .insert({
+        user_id: userId,
+        title: parsed.title,
+        model_id: globalDefaults.modelId,
+        context_size: globalDefaults.contextSize,
+        system_prompt: globalDefaults.systemPrompt,
+      })
+      .select('id, title, model_id, context_size, system_prompt, updated_at, created_at')
+      .single()
+
+    if (error || !newChat) {
+      console.error('Failed to create imported chat:', error)
+      return
+    }
+
+    // Insert messages into Supabase
+    const rows = parsed.messages.map((m) => ({
+      chat_id: newChat.id,
+      role: m.role === 'ai' ? 'assistant' : 'user',
+      content: m.content,
+    }))
+    await supabase.from('messages').insert(rows)
+
+    // Add to local state
+    const conv: Conversation = {
+      id: newChat.id,
+      title: newChat.title ?? parsed.title,
+      messages: parsed.messages.map((m) => ({
+        id: crypto.randomUUID(),
+        role: m.role,
+        content: m.content,
+        timestamp: new Date(),
+      })),
+      updatedAt: new Date(newChat.updated_at),
+      systemPrompt: newChat.system_prompt ?? '',
+      modelId: newChat.model_id ?? DEFAULT_MODEL_ID,
+      contextSize: newChat.context_size ?? 8,
+    }
+
+    setConversations((prev) => [conv, ...prev])
+    setActiveId(conv.id)
+    setConvSettingsOpen(false)
+    setInput('')
+    setSidebarOpen(false)
+  }, [globalDefaults, supabase])
+
   const handleLogout = useCallback(async () => {
     await supabase.auth.signOut()
     setConversations([])
@@ -714,6 +796,7 @@ export default function ChatPage() {
           ref={messagesRef}
           messages={active.messages}
           isLoading={isLoading}
+          isMessagesLoading={loadingMessages.has(activeId)}
           onSuggestionClick={(text) => {
             setInput(text)
           }}
@@ -774,6 +857,8 @@ export default function ChatPage() {
           updateActive((c) => ({ ...c, contextSize: v }))
           supabase.from('chats').update({ context_size: v }).eq('id', active.id).then(() => {})
         }}
+        onExport={handleExport}
+        onImport={handleImport}
       />
     </div>
   )

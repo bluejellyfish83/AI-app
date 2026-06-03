@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
-import { X } from 'lucide-react'
+import { X, Download, Upload } from 'lucide-react'
 import { ModelPicker } from './model-picker'
 import { getModelById } from '@/lib/openrouter-models'
 
@@ -19,6 +19,8 @@ interface SettingsSheetProps {
   onFontFamilyChange?: (f: 'mono' | 'sans') => void
   fontSize?: number
   onFontSizeChange?: (s: number) => void
+  onExport?: () => void
+  onImport?: (text: string) => void
 }
 
 const FONTS: { value: 'mono' | 'sans'; label: string; description: string }[] = [
@@ -40,7 +42,27 @@ export function SettingsSheet({
   onFontFamilyChange,
   fontSize,
   onFontSizeChange,
+  onExport,
+  onImport,
 }: SettingsSheetProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const handleImportClick = () => {
+    fileInputRef.current?.click()
+  }
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => {
+      const text = reader.result as string
+      onImport?.(text)
+    }
+    reader.readAsText(file)
+    // Reset so same file can be re-imported
+    e.target.value = ''
+  }
   const overlayRef = useRef<HTMLDivElement>(null)
   const currentModel = getModelById(modelId)
 
@@ -274,6 +296,54 @@ export function SettingsSheet({
             </div>
             <ModelPicker value={modelId} onChange={onModelChange} />
           </section>
+
+          {/* Export / Import */}
+          {(onExport || onImport) && (
+            <section>
+              <label className="block text-[10px] text-white/45 uppercase tracking-widest mb-1.5">
+                Conversation
+              </label>
+              <div className="flex gap-2">
+                {onExport && (
+                  <button
+                    onClick={onExport}
+                    className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl
+                      text-[11px] font-medium text-white/70 hover:text-white transition-all duration-200"
+                    style={{
+                      background: 'rgba(255,255,255,0.04)',
+                      border: '1px solid rgba(255,255,255,0.08)',
+                    }}
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    Export .md
+                  </button>
+                )}
+                {onImport && (
+                  <>
+                    <button
+                      onClick={handleImportClick}
+                      className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl
+                        text-[11px] font-medium text-white/70 hover:text-white transition-all duration-200"
+                      style={{
+                        background: 'rgba(255,255,255,0.04)',
+                        border: '1px solid rgba(255,255,255,0.08)',
+                      }}
+                    >
+                      <Upload className="w-3.5 h-3.5" />
+                      Import .md
+                    </button>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".md,.txt"
+                      onChange={handleFileChange}
+                      className="hidden"
+                    />
+                  </>
+                )}
+              </div>
+            </section>
+          )}
 
           {/* Integration instructions */}
           <section>
