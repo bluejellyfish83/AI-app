@@ -84,9 +84,9 @@ supabase/
 ### 1. Clone and install
 
 ```bash
-git clone <your-repo-url>
+git clone <your
 cd aiApp-project
-pnpm install
+npm install
 ```
 
 ### 2. Set up Supabase

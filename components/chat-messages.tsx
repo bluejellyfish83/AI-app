@@ -10,6 +10,7 @@ interface ChatMessagesProps {
   onSuggestionClick?: (text: string) => void
   onDeleteMessage?: (messageId: string) => void
   onBranchMessage?: (messageIndex: number) => void
+  onRetryMessage?: () => void
 }
 
 export interface ChatMessagesHandle {
@@ -69,7 +70,7 @@ function scrollToLastUserBubble(
 }
 
 export const ChatMessages = forwardRef<ChatMessagesHandle, ChatMessagesProps>(
-  function ChatMessages({ messages, isLoading = false, onSuggestionClick, onDeleteMessage, onBranchMessage }, ref) {
+  function ChatMessages({ messages, isLoading = false, onSuggestionClick, onDeleteMessage, onBranchMessage, onRetryMessage }, ref) {
     const scrollRef = useRef<HTMLDivElement>(null)
     const bubbleRefs = useRef<Map<string, HTMLDivElement>>(new Map())
     // Track previous message count to detect new arrivals
@@ -151,6 +152,7 @@ export const ChatMessages = forwardRef<ChatMessagesHandle, ChatMessagesProps>(
           {messages.map((message, i) => {
             const prev = messages[i - 1]
             const showDate = !prev || !isSameDay(prev.timestamp, message.timestamp)
+            const isLastUserMessage = message.role === 'user' && i === messages.findLastIndex((m) => m.role === 'user')
             return (
               <div
                 key={message.id}
@@ -164,6 +166,7 @@ export const ChatMessages = forwardRef<ChatMessagesHandle, ChatMessagesProps>(
                   message={message}
                   onDelete={onDeleteMessage ? () => onDeleteMessage(message.id) : undefined}
                   onBranch={onBranchMessage ? () => onBranchMessage(i) : undefined}
+                  onRetry={isLastUserMessage ? onRetryMessage : undefined}
                 />
               </div>
             )

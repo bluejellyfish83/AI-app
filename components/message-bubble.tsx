@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { Copy, GitBranch, Trash2, Check } from 'lucide-react'
+import { Copy, GitBranch, Trash2, Check, RotateCcw } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
@@ -19,6 +19,7 @@ interface MessageBubbleProps {
   onCopy?: () => void
   onDelete?: () => void
   onBranch?: () => void
+  onRetry?: () => void
 }
 
 function formatTime(date: Date): string {
@@ -54,7 +55,7 @@ export function DateSeparator({ label }: { label: string }) {
   )
 }
 
-export function UserBubble({ message, onCopy, onDelete, onBranch }: MessageBubbleProps) {
+export function UserBubble({ message, onCopy, onDelete, onBranch, onRetry }: MessageBubbleProps) {
   const [copied, setCopied] = useState(false)
   const [pending, setPending] = useState<'delete' | 'branch' | null>(null)
   const [tapped, setTapped] = useState(false)
@@ -137,6 +138,18 @@ export function UserBubble({ message, onCopy, onDelete, onBranch }: MessageBubbl
           data-tapped={tapped ? 'true' : undefined}
           style={{ marginTop: '1px' }}
         >
+          {onRetry && (
+            <button
+              onClick={onRetry}
+              className="w-5 h-5 rounded flex items-center justify-center
+                hover:bg-white/[0.08] transition-all duration-150"
+              style={{ color: '#d6cfc4', opacity: 0.45 }}
+              aria-label="Retry message"
+              type="button"
+            >
+              <RotateCcw className="w-3 h-3" />
+            </button>
+          )}
           <button
             onClick={handleCopy}
             className="w-5 h-5 rounded flex items-center justify-center
@@ -298,7 +311,7 @@ export function AIBubble({ message, onCopy, onDelete, onBranch }: MessageBubbleP
   )
 }
 
-export function MessageBubble({ message, onCopy, onDelete, onBranch }: MessageBubbleProps) {
-  if (message.role === 'user') return <UserBubble message={message} onCopy={onCopy} onDelete={onDelete} onBranch={onBranch} />
+export function MessageBubble({ message, onCopy, onDelete, onBranch, onRetry }: MessageBubbleProps) {
+  if (message.role === 'user') return <UserBubble message={message} onCopy={onCopy} onDelete={onDelete} onBranch={onBranch} onRetry={onRetry} />
   return <AIBubble message={message} onCopy={onCopy} onDelete={onDelete} onBranch={onBranch} />
 }

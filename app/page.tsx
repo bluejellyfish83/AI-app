@@ -439,52 +439,16 @@ export default function ChatPage() {
     [active, supabase],
   )
 
-  const sendMessage = useCallback(async () => {
-    const text = input.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim()
-    if (!text || isLoading || !active) return
-
-    const isFirst = active.messages.length === 0
-    const timestamp = new Date()
-
-    const userMsg: Message = {
-      id: crypto.randomUUID(),
-      role: 'user',
-      content: text,
-      timestamp,
-    }
-
-    // Optimistically add user message + auto-title
-    updateActive((c) => ({
-      ...c,
-      title: isFirst ? text.slice(0, 32) + (text.length > 32 ? '…' : '') : c.title,
-      messages: [...c.messages, userMsg],
-      updatedAt: timestamp,
-    }))
-    setInput('')
-    setIsLoading(true)
-
-    // Create abort controller for this request
+  // Core streaming logic — used by both sendMessage and handleRetry
+  const streamAIResponse = useCallback(async (chatId: string, text: string) => {
     const controller = new AbortController()
     abortRef.current = controller
-
-    // Auto-title: update Supabase after first message
-    if (isFirst) {
-      const autoTitle = text.slice(0, 32) + (text.length > 32 ? '…' : '')
-      supabase.from('chats').update({ title: autoTitle }).eq('id', active.id).then(() => {})
-    }
-
-    // Update chat updated_at in Supabase (also done server-side, but do it here too for sidebar ordering)
-    supabase
-      .from('chats')
-      .update({ updated_at: timestamp.toISOString() })
-      .eq('id', active.id)
-      .then(() => {})
 
     try {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chatId: active.id, content: text }),
+        body: JSON.stringify({ chatId, content: text }),
         signal: controller.signal,
       })
 
@@ -578,7 +542,73 @@ export default function ChatPage() {
       abortRef.current = null
       setIsLoading(false)
     }
-  }, [input, isLoading, active, updateActive, supabase])
+  }, [updateActive, supabase])
+
+  const sendMessage = useCallback(async () => {
+    const text = input.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim()
+    if (!text || isLoading || !active) return
+
+    const isFirst = active.messages.length === 0
+    const timestamp = new Date()
+
+    const userMsg: Message = {
+      id: crypto.randomUUID(),
+      role: 'user',
+      content: text,
+      timestamp,
+    }
+
+    // Optimistically add user message + auto-title
+    updateActive((c) => ({
+      ...c,
+      title: isFirst ? text.slice(0, 32) + (text.length > 32 ? '…' : '') : c.title,
+      messages: [...c.messages, userMsg],
+      updatedAt: timestamp,
+    }))
+    setInput('')
+    setIsLoading(true)
+
+    // Auto-title: update Supabase after first message
+    if (isFirst) {
+      const autoTitle = text.slice(0, 32) + (text.length > 32 ? '…' : '')
+      supabase.from('chats').update({ title: autoTitle }).eq('id', active.id).then(() => {})
+    }
+
+    // Update chat updated_at in Supabase (also done server-side, but do it here too for sidebar ordering)
+    supabase
+      .from('chats')
+      .update({ updated_at: timestamp.toISOString() })
+      .eq('id', active.id)
+      .then(() => {})
+
+    await streamAIResponse(active.id, text)
+  }, [input, isLoading, active, updateActive, supabase, streamAIResponse])
+
+  const handleRetry = useCallback(async () => {
+    if (!active || isLoading) return
+
+    const messages = active.messages
+    const lastUserIdx = messages.findLastIndex((m) => m.role === 'user')
+    if (lastUserIdx === -1) return
+
+    const lastUserMsg = messages[lastUserIdx]
+
+    // Find the AI message after the last user message (if any)
+    const aiMsgAfterUser = messages.slice(lastUserIdx + 1).find((m) => m.role === 'ai')
+
+    if (aiMsgAfterUser) {
+      // Delete AI response from Supabase
+      supabase.from('messages').delete().eq('id', aiMsgAfterUser.id).then(() => {})
+      // Remove from local state
+      updateActive((c) => ({
+        ...c,
+        messages: c.messages.filter((m) => m.id !== aiMsgAfterUser.id),
+      }))
+    }
+
+    setIsLoading(true)
+    await streamAIResponse(active.id, lastUserMsg.content)
+  }, [active, isLoading, updateActive, supabase, streamAIResponse])
 
   // Show loading state while initial data loads
   if (!isLoaded || !active) {
@@ -646,6 +676,7 @@ export default function ChatPage() {
           }}
           onDeleteMessage={handleDeleteMessage}
           onBranchMessage={handleBranchMessage}
+          onRetryMessage={handleRetry}
         />
       </main>
 
