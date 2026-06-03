@@ -15,10 +15,13 @@ A beautiful liquid-glass AI chat interface built with Next.js 16, React 19, Tail
 - **Multi-model chat** — 18+ models from Anthropic, OpenAI, Google, Meta, Mistral, DeepSeek, and xAI via OpenRouter
 - **Streaming responses** — real-time typewriter effect via SSE (Server-Sent Events)
 - **Stop streaming** — click the stop button during AI generation to pause/abort the response (partial content is preserved)
+- **Retry** — re-generate the last AI response (deletes the current response and re-sends the user message)
 - **Markdown rendering** — AI responses render as full Markdown (code blocks, tables, lists, etc.) with styled theme
 - **Persistent conversations** — all chats and messages stored in Supabase PostgreSQL
+- **Supabase Auth** — email/password authentication with persistent sessions across devices
+- **Import/Export** — export conversations as Markdown files, import from OpenRouter-compatible `.md` format
 - **Swipe-to-delete** — swipe left on conversations in the sidebar to reveal a delete button with confirmation dialog
-- **Message actions** — hover over any message to reveal Copy, Branch, and Delete buttons (double-press safety for destructive actions)
+- **Message actions** — hover over any message to reveal Copy, Branch, and Delete buttons (tap-to-reveal on mobile)
 - **Branching** — fork any point in a conversation into a new "Branch: <title>" chat with full message history
 - **Undo branch** — undo icon in header lets you return to (or delete) a branched conversation
 - **Configurable context window** — slider + number input to control how many past messages the model sees (1–500)
@@ -40,6 +43,7 @@ A beautiful liquid-glass AI chat interface built with Next.js 16, React 19, Tail
 | Markdown | react-markdown + remark-gfm |
 | Icons | lucide-react |
 | Database | Supabase (PostgreSQL) |
+| Auth | Supabase Auth (email/password) |
 | AI Gateway | OpenRouter (OpenAI-compatible API) |
 | Package Manager | pnpm |
 
@@ -61,16 +65,18 @@ components/
   ambient-orbs.tsx                   — animated background blobs
   chat-header.tsx                    — top bar: menu, editable title, settings
   chat-sidebar.tsx                   — slide-in conversation list with swipe-to-delete
-  chat-messages.tsx                  — scrollable message list, auto-scroll
-  message-bubble.tsx                 — UserBubble + AIBubble renderers
+  chat-messages.tsx                  — scrollable message list, auto-scroll, loading state
+  message-bubble.tsx                 — UserBubble + AIBubble renderers (tap-to-reveal on mobile)
   chat-input-bar.tsx                 — textarea, send/stop button, scroll-to-latest
   model-picker.tsx                   — model dropdown grouped by provider
-  settings-sheet.tsx                 — bottom sheet: prompt, model, font, context
+  settings-sheet.tsx                 — bottom sheet: prompt, model, font, context, export/import
   chat-empty-state.tsx               — empty state (ambient orbs show through)
+  login-form.tsx                     — email/password auth form
 
 lib/
-  supabase.ts                        — browser + service client factories
+  supabase.ts                        — browser singleton + service client factories
   openrouter-models.ts               — model catalogue, live fetch, localStorage cache
+  markdown-export.ts                 — export/import conversations as OpenRouter-style Markdown
   utils.ts                           — cn() Tailwind merge utility
 
 supabase/
@@ -84,7 +90,7 @@ supabase/
 ### 1. Clone and install
 
 ```bash
-git clone <your
+git clone <your-repo>
 cd aiApp-project
 npm install
 ```
@@ -93,7 +99,9 @@ npm install
 
 1. Create a project at [supabase.com](https://supabase.com)
 2. Go to **SQL Editor** and run the contents of `supabase/schema.sql`
-3. Copy your project URL and API keys from **Settings → API**
+3. Go to **Authentication → Providers** → enable **Email** provider
+4. Under Email settings, **disable "Confirm email"** (so sign-up works immediately)
+5. Copy your project URL and API keys from **Settings → API**
 
 ### 3. Configure environment variables
 
@@ -142,7 +150,7 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ## Database Schema
 
-Three tables, all with RLS disabled (auth is client-side via localStorage `user_id`):
+Three tables, with RLS enabled for auth:
 
 ```
 chats              — id, user_id, title, model_id, context_size, system_prompt, branched_from, created_at, updated_at
@@ -150,9 +158,18 @@ messages           — id, chat_id (FK), role, content, created_at
 daily_summaries    — id, chat_id (FK), summary_date, summary, created_at
 ```
 
-> For existing databases, run: `ALTER TABLE chats ADD COLUMN branched_from UUID REFERENCES chats(id) ON DELETE SET NULL;`
-
 Run `supabase/schema.sql` in the Supabase SQL Editor to create these tables.
+
+### Migrating from localStorage auth to Supabase Auth
+
+If you previously used the localStorage-based anonymous user ID:
+
+1. Sign up through the app's login form
+2. Find your Supabase Auth UID in **Supabase Dashboard → Authentication → Users**
+3. Run in SQL Editor:
+```sql
+UPDATE chats SET user_id = '<supabase-auth-uid>' WHERE user_id = '<old-localStorage-uuid>';
+```
 
 ---
 
@@ -168,30 +185,59 @@ Run `supabase/schema.sql` in the Supabase SQL Editor to create these tables.
 6. Returns SSE stream → frontend reads chunks and appends to AI message (typewriter effect)
 7. After stream ends, API awaits saving the full assistant message to Supabase before closing
 8. User can click the **stop button** (square icon) at any time to abort the stream — partial content is preserved
-
-> **Important**: The user message is saved AFTER fetching context to avoid sending it twice to the LLM. The assistant message save is `await`ed before the stream closes to ensure persistence on Vercel's serverless runtime.
+9. User can click **retry** to delete the last AI response and re-generate
 
 ### Conversation Management
 
 - **Create**: Click "New conversation" in the sidebar
 - **Switch**: Click any conversation in the sidebar
-- **Delete**: Swipe left on a conversation to reveal a red delete button → tap it → confirm with "Delete" in the popup
+- **Delete**: Swipe left on a conversation to reveal a red delete button → tap it → confirm with "Delete" in the popup (optimistic — UI updates instantly)
 - **Rename**: Click the conversation title in the header to edit inline
 - **Auto-title**: New chats are automatically titled from the first 32 characters of the first message
 - **Branch**: Hover any message → click the git-branch icon (double-click to confirm) → creates a new chat prefixed with "Branch: "
 - **Undo branch**: Branched conversations show an undo icon in the header → click to return to (or delete) the branch
+- **Export**: Open conversation settings → "Export .md" button → downloads conversation as OpenRouter-style Markdown
+- **Import**: Open conversation settings → "Import .md" button → pick a `.md` file → creates new conversation
 
 ### Message Actions
 
 - **Copy**: Hover any message → click the copy icon to copy content to clipboard
 - **Delete**: Hover → click trash icon → icon turns red → click again to confirm (auto-resets after 3s)
 - **Branch**: Hover → click branch icon → icon turns purple → click again to confirm
+- **Retry**: Appears on the last user message → click to delete AI response and re-generate
+- **Mobile**: Tap a message bubble to reveal action buttons (tap elsewhere to dismiss)
+
+### Import/Export Format
+
+Exported Markdown follows the OpenRouter conversation format:
+
+```markdown
+# Conversation Title
+
+**User - --**
+
+message content here
+
+**Assistant - --**
+
+response content here
+```
+
+Import also supports `## Human`, `## Assistant`, `## User` header variants.
+
+### Authentication
+
+- Supabase Auth with email/password (no email verification required)
+- Session persisted via Supabase's built-in localStorage token storage
+- Works across devices — same email/password = same conversations
+- Singleton Supabase client pattern prevents multiple GoTrueClient instances
 
 ### Font & Display Settings
 
 - **Font family**: Choose between Geist Sans (clean sans-serif) or Geist Mono (monospace) — applies everywhere: sidebar, settings, model picker, messages
 - **Font size**: Adjustable from 10px to 20px via slider or number input
 - **Context messages**: Configurable from 1 to 500 messages sent to the model per request
+- **Settings persistence**: Global defaults (font, model, context size) saved to localStorage and restored on reload
 
 ### Memory System
 
@@ -199,12 +245,6 @@ Run `supabase/schema.sql` in the Supabase SQL Editor to create these tables.
 - **Long-term**: Daily summaries stored in `daily_summaries` table, prepended to system prompt
 - Summaries are generated by a cron job (`/api/cron/summarize`) that processes yesterday's conversations
 - Uses `openai/gpt-4o-mini` for summarization (cheap, max 200 tokens per summary)
-
-### User Identity
-
-- Each user gets a random UUID stored in `localStorage` under `liquid_user_id`
-- No authentication system — just a persistent anonymous ID
-- All chats are scoped to this user ID
 
 ---
 
@@ -280,3 +320,9 @@ This project deploys on [Vercel](https://vercel.com):
 4. Deploy
 
 `app/api/chat` and `app/api/cron/summarize` use **Node.js runtime** (needed for reliable async DB writes after streaming). `app/api/models` uses **Edge Runtime** for low-latency model list proxying.
+
+---
+
+## Known Limitations
+
+- **Bulk delete slowness**: Deleting many conversations in rapid succession may temporarily exhaust the Supabase connection pool (free tier has ~60 concurrent connections, each cascade delete uses one). This self-resolves within a few seconds. Not an issue for normal usage.
