@@ -10,6 +10,7 @@ import { SettingsSheet } from '@/components/settings-sheet'
 import type { Message } from '@/components/message-bubble'
 import { DEFAULT_MODEL_ID } from '@/lib/openrouter-models'
 import { createBrowserClient } from '@/lib/supabase'
+import { LoginForm } from '@/components/login-form'
 
 export interface Conversation {
   id: string
@@ -91,17 +92,37 @@ export default function ChatPage() {
   const [globalSettingsOpen, setGlobalSettingsOpen] = useState(false)
   const [convSettingsOpen, setConvSettingsOpen] = useState(false)
   const [isLoaded, setIsLoaded] = useState(false)
+  const [session, setSession] = useState<unknown>(null)
+  const [authChecked, setAuthChecked] = useState(false)
 
   const messagesRef = useRef<ChatMessagesHandle>(null)
   const abortRef = useRef<AbortController | null>(null)
   const supabase = useRef(createBrowserClient()).current
+  const userIdRef = useRef<string>('')
 
   const active = conversations.find((c) => c.id === activeId) ?? conversations[0]
 
+  // ── Auth check on mount ──────────────────────────────────────────
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session: s } }) => {
+      setSession(s)
+      if (s?.user) userIdRef.current = s.user.id
+      setAuthChecked(true)
+    })
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
+      setSession(s)
+      if (s?.user) userIdRef.current = s.user.id
+      setAuthChecked(!s) // re-trigger load if signed out
+    })
+
+    return () => subscription.unsubscribe()
+  }, [supabase])
+
   // ── Initial load: fetch chats from Supabase ──────────────────────
   useEffect(() => {
-    const userId = getUserId()
-    if (!userId) return
+    const userId = userIdRef.current
+    if (!userId || !authChecked) return
 
     async function load() {
       const { data: chats, error } = await supabase
@@ -211,7 +232,7 @@ export default function ChatPage() {
     }
 
     load()
-  }, [supabase])
+  }, [supabase, authChecked])
 
   // ── Load messages when active chat changes ───────────────────────
   // Track which chats have had their messages loaded
@@ -270,7 +291,7 @@ export default function ChatPage() {
   )
 
   const handleNewConversation = useCallback(async () => {
-    const userId = getUserId()
+    const userId = userIdRef.current
     const { data: newChat, error } = await supabase
       .from('chats')
       .insert({
@@ -371,7 +392,7 @@ export default function ChatPage() {
   const handleBranchMessage = useCallback(
     async (messageIndex: number) => {
       if (!active) return
-      const userId = getUserId()
+      const userId = userIdRef.current
       const branchMessages = active.messages.slice(0, messageIndex + 1)
 
       // Create new chat in Supabase
@@ -610,6 +631,27 @@ export default function ChatPage() {
     await streamAIResponse(active.id, lastUserMsg.content)
   }, [active, isLoading, updateActive, supabase, streamAIResponse])
 
+  const handleLogout = useCallback(async () => {
+    await supabase.auth.signOut()
+    setConversations([])
+    setActiveId('')
+    setIsLoaded(false)
+    setSession(null)
+    userIdRef.current = ''
+  }, [supabase])
+
+  // Show login form if not authenticated
+  if (authChecked && !session) {
+    return (
+      <div className={`relative flex flex-col h-[100dvh] overflow-hidden bg-[#030308] ${globalDefaults.fontFamily === 'sans' ? 'font-sans' : 'font-mono'}`}>
+        <AmbientOrbs />
+        <LoginForm onAuth={() => {
+          // Session will be picked up by onAuthStateChange
+        }} />
+      </div>
+    )
+  }
+
   // Show loading state while initial data loads
   if (!isLoaded || !active) {
     return (
@@ -646,6 +688,7 @@ export default function ChatPage() {
           setSidebarOpen(false)
           setGlobalSettingsOpen(true)
         }}
+        onLogout={handleLogout}
       />
 
       <ChatHeader

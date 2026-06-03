@@ -3,6 +3,13 @@ import { createClient } from '@supabase/supabase-js'
 /**
  * Browser-side Supabase client (uses anon key, safe for client).
  * Call this from React components / client code.
+ *
+ * NOTE: Multiple calls to createBrowserClient() may trigger a
+ * "Multiple GoTrueClient instances" warning in the browser console.
+ * This is a cosmetic warning — it has zero impact on Vercel costs,
+ * Supabase usage, or app functionality. To fix properly, generate
+ * typed Supabase client via `supabase gen types typescript` and use
+ * a singleton pattern with proper generics.
  */
 export function createBrowserClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!

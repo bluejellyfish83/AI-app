@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo, useRef } from 'react'
-import { X, Plus, MessageSquare, Search, SlidersHorizontal, Trash2 } from 'lucide-react'
+import { X, Plus, MessageSquare, Search, SlidersHorizontal, Trash2, LogOut } from 'lucide-react'
 import type { Conversation } from '@/app/page'
 
 interface ChatSidebarProps {
@@ -13,6 +13,7 @@ interface ChatSidebarProps {
   onNew: () => void
   onDelete: (id: string) => void
   onOpenGlobalSettings: () => void
+  onLogout?: () => void
 }
 
 function formatRelativeTime(date: Date): string {
@@ -39,6 +40,7 @@ export function ChatSidebar({
   onNew,
   onDelete,
   onOpenGlobalSettings,
+  onLogout,
 }: ChatSidebarProps) {
   const [query, setQuery] = useState('')
   const [deletingId, setDeletingId] = useState<string | null>(null)
@@ -355,6 +357,20 @@ export function ChatSidebar({
             </ul>
           )}
         </div>
+
+        {/* Logout button */}
+        {onLogout && (
+          <div className="px-4 py-3 border-t border-white/[0.07]">
+            <button
+              onClick={onLogout}
+              className="w-full flex items-center gap-2 px-3 py-2 rounded-xl
+                text-[11px] text-white/40 hover:text-white/60 transition-all duration-200"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              Sign out
+            </button>
+          </div>
+        )}
       </aside>
     </>
   )
